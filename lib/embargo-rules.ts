@@ -41,11 +41,13 @@ export const aiEmbargoGrievanceWindowSeconds = grievanceConfig.borderIncidentWin
 export const aiEmbargoRefusalCooldownSeconds = treatyProposalCooldownSlots * treatyProposalSlotSeconds;
 export const aiEmbargoRequestId = (slot: number, actor: string, target: string) => `ai-embargo-${slot}-${actor}-${target}`;
 export type AiEmbargoBreak = { kind: string; status: string; proposer: string; other: string; brokenBy: string | null; endedAt: number | null };
-export type AiEmbargoRow = { id?: string; actor: string; target: string; status: string; decidedAt?: number | null };
+export type AiEmbargoRow = { id?: string; requestId?: string; actor: string; target: string; status: string; decidedAt?: number | null };
 export type AiEmbargoTreaty = { kind: string; status: string; proposer: string; other: string; endsAt?: number | null };
 export type AiEmbargoCandidate = { actor: TreatyNationId; target: TreatyNationId; endedAt: number };
 const cmp = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const inWindow = (now: number, endedAt: number) => endedAt <= now && now - endedAt <= aiEmbargoGrievanceWindowSeconds;
+/** A future break has not aged out, so it keeps an embargo the way a break inside the window does. It is not a new proposal. */
+const stillOpen = (now: number, endedAt: number) => endedAt > now || inWindow(now, endedAt);
 const treatyLive = (row: AiEmbargoTreaty, now: number) => row.status === 'in_force' && isTreatyKind(row.kind) && typeof row.endsAt === 'number' && row.endsAt > now;
 const sidesOf = (row: AiEmbargoBreak) => {
   if (row.status !== 'broken' || !isTreatyKind(row.kind) || !isTreatyNation(row.brokenBy)) return null;
@@ -68,12 +70,12 @@ export function aiEmbargoCandidates(now: number, breaks: readonly AiEmbargoBreak
   return [...best.values()].sort((a, b) => a.endedAt - b.endedAt || cmp(a.actor, b.actor) || cmp(a.target, b.target));
 }
 
-/** Lift an in-force embargo when the target has no in-window break left, or the pair has a new in-force treaty. */
+/** Lift an in-force embargo when no break is still open, or the pair has a new in-force treaty. The caller passes only ai-embargo-* rows. */
 export function aiEmbargoLifts(now: number, embargoes: readonly AiEmbargoRow[], breaks: readonly AiEmbargoBreak[], treaties: readonly AiEmbargoTreaty[]) {
   const out: Array<{ id: string; actor: TreatyNationId; target: TreatyNationId }> = [];
   for (const row of embargoes) {
     if (row.status !== 'in_force' || !row.id || !isTreatyNation(row.actor) || !isTreatyNation(row.target)) continue;
-    const fresh = breaks.some(item => item.endedAt != null && inWindow(now, item.endedAt) && sidesOf(item)?.actor === row.actor && sidesOf(item)?.target === row.target);
+    const fresh = breaks.some(item => item.endedAt != null && stillOpen(now, item.endedAt) && sidesOf(item)?.actor === row.actor && sidesOf(item)?.target === row.target);
     if (!fresh || settled(treaties, row.actor, row.target, now)) out.push({ id: row.id, actor: row.actor, target: row.target });
   }
   return out.sort((a, b) => cmp(a.actor, b.actor) || cmp(a.target, b.target) || cmp(a.id, b.id));

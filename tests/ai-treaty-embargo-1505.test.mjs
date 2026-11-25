@@ -55,6 +55,7 @@ describe('#1505', { concurrency: 1 }, () => {
     const lifts = (embargoes, breaks, treaties = []) => aiEmbargoLifts(now, embargoes, breaks, treaties).map(row => row.id);
     const row = (id, actor, target) => ({ id, actor, target, status: 'in_force' });
     assert.deepEqual(lifts([row('e1', 'kindle', 'aurelle')], [brk({ endedAt: edge })]), [], 'a break at the window edge does not lift');
+    assert.deepEqual(lifts([row('e1', 'kindle', 'aurelle')], [brk({ endedAt: now + 1 })]), [], 'a future break does not lift');
     assert.deepEqual(lifts([row('e1', 'kindle', 'aurelle')], [brk({ endedAt: edge - 1 })]), ['e1'], 'a break older than the window lifts');
     assert.deepEqual(lifts([row('e1', 'kindle', 'aurelle')], [brk({ endedAt: edge - 1 }), brk({ endedAt: now - 10 })]), [], 'one fresh break keeps the embargo');
     assert.deepEqual(lifts([row('e1', 'kindle', 'aurelle')], [brk()], [live()]), ['e1'], 'a new in-force treaty lifts');
@@ -79,6 +80,8 @@ describe('#1505', { concurrency: 1 }, () => {
     assert.doesNotMatch(readFileSync('app/api/news/route.ts', 'utf8'), /runAiTreatyEmbargoes/);
     assert.match(readFileSync('lib/diplomacy.ts', 'utf8'), /bindAiTreatyEmbargoes/);
     assert.match(readFileSync('worker/entry.ts', 'utf8'), /runDiplomacyCron\(await getDatabase\(\)/);
+    assert.match(readFileSync('worker/entry.ts', 'utf8'), /HARIMU_AI_TREATY_EMBARGO_ENABLED\?: string; HARIMU_GRAY_PACK\?: unknown/);
+    assert.match(readFileSync('lib/embargo.ts', 'utf8'), /worldReputationBreaksSql/);
     assert.match(readFileSync('lib/embargo.ts', 'utf8'), /\[ASSUMPTION\] docs §8\.3/);
   });
 
@@ -102,7 +105,9 @@ describe('#1505', { concurrency: 1 }, () => {
       const newer = await breakNap('kindle', 'korund', 'korund', t0 + 100);
       const agedAt = newer - WINDOW - 1;
       await r.db.prepare("INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,broken_by) VALUES ('t-aged','req-aged-1505','aurelle:kindle','trade','kindle','aurelle','AI',1,'broken',1,1,?,?,'aurelle')").bind(agedAt + 100, agedAt).run();
+      await r.db.prepare("INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,broken_by) VALUES ('t-ai-aged','req-ai-aged-1505','kindle:korund','non-aggression','korund','kindle','AI',1,'broken',1,1,?,?,'kindle')").bind(agedAt + 100, agedAt).run();
       await r.db.prepare("INSERT INTO embargoes (id,request_id,pair_key,actor_nation,target_nation,proposed_by,proposed_at,status,decided_at,imposed_at) VALUES ('e-aged','req-embargo-aged','aurelle:kindle','kindle','aurelle',?,1,'in_force',1,1)").bind(treatyAiLeaders.kindle).run();
+      await r.db.prepare("INSERT INTO embargoes (id,request_id,pair_key,actor_nation,target_nation,proposed_by,proposed_at,status,decided_at,imposed_at) VALUES ('e-ai-aged','ai-embargo-aged','kindle:korund','korund','kindle',?,1,'in_force',1,1)").bind(treatyAiLeaders.korund).run();
       const packed = { HARIMU_DIPLOMACY_ENABLED: 'true', HARIMU_EMBARGO_ENABLED: 'true', HARIMU_GRAY_PACK: { [FLAG]: 'true' } };
       const off = [
         {},
@@ -115,8 +120,8 @@ describe('#1505', { concurrency: 1 }, () => {
         assert.equal((await e.runAiTreatyEmbargoes(r.db, newer, { enabled: false })).status, 'disabled');
         await d.runDiplomacyCron(r.db, newer, bindings);
       }
-      assert.equal((await rows()).length, 1);
-      assert.equal((await rows())[0].status, 'in_force', 'flag off writes no embargo');
+      assert.equal((await rows()).length, 2);
+      assert.ok((await rows()).every(row => row.status === 'in_force'), 'flag off writes no embargo');
       r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
       r.setFixtureEnv('HARIMU_EMBARGO_ENABLED', 'true');
       r.setFixtureEnv(FLAG, 'true');
@@ -125,16 +130,17 @@ describe('#1505', { concurrency: 1 }, () => {
       try { await r.call('world', null); await r.call('citizen', 'alice'); await r.call('news', 'alice'); }
       finally { r.db.prepare = prepare; }
       assert.deepEqual(writes, [], 'no GET route writes an embargo');
-      assert.equal((await rows())[0].status, 'in_force');
+      assert.ok((await rows()).every(row => row.status === 'in_force'));
       await d.runDiplomacyCron(r.db, newer, packed);
       const slot = treatySlot(newer);
       const proposed = (await rows()).find(row => row.request_id === aiEmbargoRequestId(slot, 'korund', 'aurelle'));
       assert.ok(proposed, 'only the oldest candidate is proposed');
       assert.equal(proposed.proposed_by, treatyAiLeaders.korund);
       assert.equal(proposed.status, 'proposed');
-      assert.equal((await rows()).find(row => row.id === 'e-aged').status, 'lifted', 'a break older than the window lifts');
+      assert.equal((await rows()).find(row => row.id === 'e-aged').status, 'in_force', 'a non-AI embargo stays in force');
+      assert.equal((await rows()).find(row => row.id === 'e-ai-aged').status, 'lifted', 'an aged ai-embargo is lifted');
       await d.runDiplomacyCron(r.db, newer + 10, packed);
-      assert.equal((await rows()).filter(row => String(row.request_id).startsWith('ai-embargo-')).length, 1, 'only one embargo is proposed per slot');
+      assert.equal((await rows()).filter(row => String(row.request_id).startsWith(`ai-embargo-${slot}-`)).length, 1, 'only one embargo is proposed per slot');
       await e.runEmbargo(r.db, newer + 20);
       const imposed = (await rows()).find(row => row.id === proposed.id);
       assert.equal(imposed.status, 'in_force');
@@ -163,6 +169,21 @@ describe('#1505', { concurrency: 1 }, () => {
       assert.deepEqual(JSON.parse(refused.ratification_json)[0], { nation: 'kindle', body: 'Assembly', passed: false, rule: 'simple-majority', yes: 5, total: 18 });
       await r.db.prepare("DELETE FROM treaties WHERE kind='trade' AND status='proposed'").run();
       assert.equal((await d.proposeTreaty(r.db, { proposer: 'korund', other: 'aurelle', kind: 'trade', proposedBy: 'AI leader', requestId: randomUUID() }, later + 6, { enabled: true, embargo: true })).ok, true, 'trade opens again after the lift');
+      assert.equal((await rows()).find(row => row.id === 'e-aged').status, 'in_force');
+    });
+
+    test(`#1505 (${backend}): more than 20 breaks still proposes the uncapped in-window break`, async t => {
+      const r = await localRuntime({ backend }); t.after(() => r.close());
+      const d = await r.importModule('lib/diplomacy.ts');
+      const now = Math.floor(r.now / 1000);
+      const insert = (id, ended, breaker, proposer, other) => r.db.prepare("INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,broken_by) VALUES (?,?,?,'non-aggression',?,?,'AI',1,'broken',1,1,?,?,?)")
+        .bind(id, `req-cap-${id}`, [proposer, other].sort().join(':'), proposer, other, ended + 10, ended, breaker).run();
+      for (let i = 0; i < 21; i++) await insert(`f${i}`, now + 1000 + i, 'korund', 'kindle', 'korund');
+      await insert('qual', now - 10, 'aurelle', 'kindle', 'aurelle');
+      await d.runDiplomacyCron(r.db, now, { HARIMU_DIPLOMACY_ENABLED: 'true', HARIMU_EMBARGO_ENABLED: 'true', HARIMU_GRAY_PACK: { [FLAG]: 'true' } });
+      const want = aiEmbargoRequestId(treatySlot(now), 'kindle', 'aurelle');
+      const found = (await r.db.prepare('SELECT request_id FROM embargoes').all()).results.some(row => row.request_id === want);
+      assert.equal(found, true, 'more than 20 breaks still proposes the uncapped in-window break');
     });
   }
 
@@ -179,6 +200,9 @@ describe('#1505', { concurrency: 1 }, () => {
       { file: 'lib/embargo.ts', find: 'if (!options.enabled) return { status: \'disabled\' as const, proposed: false, lifted: 0 };', replace: 'if (false) return { status: \'disabled\' as const, proposed: false, lifted: 0 };', pattern: cron },
       { file: 'lib/diplomacy.ts', find: 'flagOn(bindings, \'HARIMU_AI_TREATY_EMBARGO_ENABLED\')', replace: 'true', pattern: cron },
       { file: 'lib/embargo.ts', find: 'if (taken) return { status: \'ok\' as const, proposed: false, lifted: liftedIds.size };', replace: 'if (false) return { status: \'ok\' as const, proposed: false, lifted: liftedIds.size };', pattern: cron },
+      { file: 'lib/embargo.ts', find: ".filter(row => row.requestId?.startsWith('ai-embargo-'))", replace: '.filter(() => true)', pattern: cron },
+      { file: 'lib/embargo-rules.ts', find: 'endedAt > now || inWindow(now, endedAt)', replace: 'inWindow(now, endedAt)', pattern: pure },
+      { file: 'lib/diplomacy-rules.ts', find: 'GROUP BY broken_by, kind, id, proposer_nation, other_nation, ended_at', replace: 'GROUP BY broken_by, kind, id, proposer_nation, other_nation, ended_at ORDER BY ended_at DESC LIMIT 20', pattern: 'more than 20 breaks' },
     ];
     const tree = mutantTree(); // #1508: mutants stay in a private copy so parallel shards do not compile them
     try {

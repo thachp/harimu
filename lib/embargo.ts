@@ -1,7 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { bindAiTreatyEmbargoes, kindleSeats } from './diplomacy';
-import { cleanTreatyLabel, treatyActorMax, treatyAiLeaders, treatySlot, type Ratification, type TreatyNationId } from './diplomacy-rules';
+import { cleanTreatyLabel, treatyActorMax, treatyAiLeaders, treatySlot, worldReputationBreaksSql, type Ratification, type TreatyNationId } from './diplomacy-rules';
 import { EMBARGO_NAME_MAX, pressFor, tradeClosed } from './embargo-copy';
 import { aiEmbargoCandidates, aiEmbargoLifts, aiEmbargoRequestId, embargoNationNames, embargoPairKey, embargoRatification, embargoRequestIdOk, embargoStatus, isEmbargoNation, type AiEmbargoBreak, type AiEmbargoRow, type AiEmbargoTreaty, type EmbargoDbStatus, type EmbargoStatus } from './embargo-rules';
 export * from './embargo-rules';
@@ -95,18 +95,18 @@ export async function runEmbargo(db: GameDatabase, now: number) { await decidePr
 /** #1505: one embargo proposal per treaty slot, plus any due lifts. Flag off (caller passes enabled: false): no proposal and no lift. */
 export async function runAiTreatyEmbargoes(db: GameDatabase, now: number, options: { enabled: boolean }) {
   if (!options.enabled) return { status: 'disabled' as const, proposed: false, lifted: 0 };
-  type BreakRow = { kind: string; status: string; proposer_nation: string; other_nation: string; broken_by: TreatyNationId | null; ended_at: number | null };
-  type LiveRow = { id: string; actor_nation: TreatyNationId; target_nation: TreatyNationId; status: EmbargoDbStatus; decided_at: number | null };
+  type BreakRow = { id: string; broken_by: string | null; kind: string; proposer_nation: string; other_nation: string; ended_at: number | null; n: number };
+  type LiveRow = { id: string; request_id: string; actor_nation: TreatyNationId; target_nation: TreatyNationId; status: EmbargoDbStatus; decided_at: number | null };
   type TreatyRow = { kind: string; status: string; proposer_nation: string; other_nation: string; ends_at: number | null };
   const empty = <T>() => ({ results: [] as T[] });
-  const breaks = (await db.prepare("SELECT kind,status,proposer_nation,other_nation,broken_by,ended_at FROM treaties WHERE status='broken'").all<BreakRow>().catch(tolerate(isMissingRelation, empty<BreakRow>()))).results;
-  const embargoes = (await db.prepare("SELECT id,actor_nation,target_nation,status,decided_at FROM embargoes WHERE status IN ('proposed','in_force','rejected')").all<LiveRow>().catch(tolerate(isMissingRelation, empty<LiveRow>()))).results;
+  const breaks = (await db.prepare(worldReputationBreaksSql).all<BreakRow>().catch(tolerate(isMissingRelation, empty<BreakRow>()))).results;
+  const embargoes = (await db.prepare("SELECT id,request_id,actor_nation,target_nation,status,decided_at FROM embargoes WHERE status IN ('proposed','in_force','rejected')").all<LiveRow>().catch(tolerate(isMissingRelation, empty<LiveRow>()))).results;
   const treaties = (await db.prepare("SELECT kind,status,proposer_nation,other_nation,ends_at FROM treaties WHERE status='in_force'").all<TreatyRow>().catch(tolerate(isMissingRelation, empty<TreatyRow>()))).results;
-  const breakInputs: AiEmbargoBreak[] = breaks.map(row => ({ kind: row.kind, status: row.status, proposer: row.proposer_nation, other: row.other_nation, brokenBy: row.broken_by, endedAt: num(row.ended_at) }));
-  const embargoInputs: AiEmbargoRow[] = embargoes.map(row => ({ id: row.id, actor: row.actor_nation, target: row.target_nation, status: row.status, decidedAt: num(row.decided_at) }));
+  const breakInputs: AiEmbargoBreak[] = breaks.map(row => ({ kind: row.kind, status: 'broken', proposer: row.proposer_nation, other: row.other_nation, brokenBy: row.broken_by, endedAt: num(row.ended_at) }));
+  const embargoInputs: AiEmbargoRow[] = embargoes.map(row => ({ id: row.id, requestId: row.request_id, actor: row.actor_nation, target: row.target_nation, status: row.status, decidedAt: num(row.decided_at) }));
   const treatyInputs: AiEmbargoTreaty[] = treaties.map(row => ({ kind: row.kind, status: row.status, proposer: row.proposer_nation, other: row.other_nation, endsAt: num(row.ends_at) }));
   const liftedIds = new Set<string>();
-  for (const item of aiEmbargoLifts(now, embargoInputs, breakInputs, treatyInputs)) {
+  for (const item of aiEmbargoLifts(now, embargoInputs.filter(row => row.requestId?.startsWith('ai-embargo-')), breakInputs, treatyInputs)) {
     const result = await liftEmbargo(db, item.id, item.actor, now, true);
     if (result.ok) liftedIds.add(item.id);
   }
