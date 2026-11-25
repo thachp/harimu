@@ -257,8 +257,10 @@
       "HARIMU_AURELLE_BROADSHEETS_ENABLED": "false",
       // #1490: trade agreements that expire by term can be re-ratified for a fresh, gapless term (docs §13.2). Off: expiry is unchanged and nothing is renewed. GRAY 97 (index 96), after Aurelle broadsheets. Only acts when HARIMU_DIPLOMACY_ENABLED is on too.
       "HARIMU_TRADE_RENEWAL_ENABLED": "false",
-      // #1495 GRAY 99 (index 97 today). Needs HARIMU_DIPLOMACY_ENABLED. Follows #1494 GRAY 97. #1497 GRAY 98 has not landed; a later rematch will move this to index 98.
-      "HARIMU_NAP_REPUTATION_GATE_ENABLED": "false"
+      // #1495 GRAY 99 (index 97). Needs HARIMU_DIPLOMACY_ENABLED. Follows #1494 GRAY 97.
+      "HARIMU_NAP_REPUTATION_GATE_ENABLED": "false",
+      // #1491: the attacker's staging-square terrain adds to the defender's battle bonus (docs §15.3). Off: battles resolve as today and responses carry no terrain keys. Needs HARIMU_ARMY_BATTLES_ENABLED. GRAY 98 at index 98, after the NAP reputation gate.
+      "HARIMU_BATTLE_TERRAIN_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",

@@ -99,6 +99,8 @@ export const unitMembership={
  battleStances:L('Squads: {hold} holding, {advance} advancing, {fall_back} falling back.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #1061, the other side's mix once the battle has resolved (counts only).
  opponentBattleStances:L('{nation} squads: {hold} holding, {advance} advancing, {fall_back} falling back.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #1491, the staging square during a live battle.
+ battleGround:L('Ground: {terrain} (defenders +{pct}%)'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #911, a wounded soldier (never killed, gear kept).
  wounded:L('Wounded, back in action {time}.'),
  notEligible:L('You cannot join this unit: {reason}'),
