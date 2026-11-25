@@ -1,5 +1,5 @@
 /** #1491: the attacker's staging square adds its terrain to the defender's battle bonus (docs §15.3). No migration.
- *  Flag HARIMU_BATTLE_TERRAIN_ENABLED, GRAY 98 (index 97), directly after HARIMU_TRADE_RENEWAL_ENABLED (GRAY 97, index 96).
+ *  Flag HARIMU_BATTLE_TERRAIN_ENABLED, GRAY 98 at index 98, directly after HARIMU_NAP_REPUTATION_GATE_ENABLED (GRAY 99, index 97).
  *  Needs army battles. Flag off: the response and the card stay byte-identical. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -48,10 +48,11 @@ test('terrain tiers, a 35% maximum, bonus 0 matches today, hills beats plains, a
   assert.match(readFileSync('app/army-card.tsx', 'utf8'), /\{unit\.battle\?\.terrain && <p>\{battleGroundLine\(unit\.battle\)\}<\/p>\}/);
 });
 
-test('the flag is preview true, production false, GRAY 98 at index 97, and listed in previewOnFlags', () => {
+test('the flag is preview true, production false, GRAY 98 at index 98, and listed in previewOnFlags', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_BROADSHEETS_ENABLED'), 95);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 97);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_NAP_REPUTATION_GATE_ENABLED'), 97);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 98);
   const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   assert.equal(preview.vars[FLAG], undefined);
@@ -60,8 +61,10 @@ test('the flag is preview true, production false, GRAY 98 at index 97, and liste
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 97);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 97);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_NAP_REPUTATION_GATE_ENABLED'), 97);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_NAP_REPUTATION_GATE_ENABLED'), 97);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 98);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 98);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, FLAG), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, FLAG), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [FLAG]: 'false' }, FLAG), false);
