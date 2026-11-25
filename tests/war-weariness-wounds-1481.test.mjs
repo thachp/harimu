@@ -1,10 +1,9 @@
 /** #1481: with HARIMU_WAR_WEARINESS_LOSSES_ENABLED, army_wounds in the rolling week feed the casualty add-on (docs 15.3 / 15.4). No new flag. */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 import { WEARINESS_WEEK_SECONDS as WEEK, warWearinessUnrest, wearinessConfig } from '../lib/war-rules.ts';
 
 const KINDLE = 'kindle-home-guard', KORUND = 'korund-home-guard', AURELLE = 'aurelle-home-guard';
@@ -174,18 +173,6 @@ test('#1481 BATTLE_ROUND_SECONDS is the window tick length', async t => {
   assert.equal(battle.BATTLE_ROUND_SECONDS, 600, 'docs §15.3: a round every 10 real minutes');
 });
 
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (files, pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
-
 test('#1481 mutations: skipping the count, charging the winner, and a window off-by-one all fail', () => {
   const file = 'tests/war-weariness-wounds-1481.test.mjs';
   const cases = [
@@ -208,11 +195,14 @@ test('#1481 mutations: skipping the count, charging the winner, and a window off
       pattern: 'exactly one week ago is outside',
     },
   ];
-  for (const c of cases) {
-    const restore = mutate(c.file, c.find, c.replace);
-    try {
-      const result = run([file], c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
-    } finally { restore(); }
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const restore = tree.mutate(c.file, c.find, c.replace);
+      try {
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
+      } finally { restore(); }
+    }
+  } finally { tree.close(); }
 });

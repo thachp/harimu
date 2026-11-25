@@ -50,7 +50,7 @@ export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId)
  *  #1480: withWorldReputationRecord attaches the visible broken-treaty record; the SQL is the same uncapped #1477 source, with one row per break. */
 export type WorldReputationScore = { score: number; brokenPacts: number };
 export type WorldReputationBreak = { other: TreatyNationId; kind: TreatyKind; brokenAt: number; brokenGameDay: number; penalty: number };
-export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number; legitimacy: number };
+export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number; legitimacy: number; debasements?: number };
 export type WorldReputationScoreMap = Record<TreatyNationId, WorldReputationScore>;
 export type WorldReputationMap = Record<TreatyNationId, WorldReputation>;
 export const worldReputationRecordLimit = 10;
@@ -117,6 +117,37 @@ export function withWorldReputationRecord(
     result[nation] = { ...(scores[nation] ?? { score: 0, brokenPacts: 0 }), record, earlierBreaks: Math.max(0, all.length - worldReputationRecordLimit), legitimacy: derivedLegitimacy[nation] ?? 0 };
   }
   return result;
+}
+
+/** #1496: World Reputation input from Aurelle Crown debasement decrees (docs §13.4 monetary conduct).
+ *  [ASSUMPTION, ARC 7168979568]: −5 per decree in a rolling window of the last 3 Crown game years
+ *  (crown_decrees.game_year against the current year from gameYear in lib/crown-debasement-rules.ts).
+ *  Counted by number of decrees, not size. The window, and a hard cap of 3, keep the debasement
+ *  penalty at most −15 so debasement alone cannot trip the #1502 NAP gate (≤ −20). Placeholder tuning.
+ *  Nothing is stored. */
+export const debasementReputationPenalty = -5;
+export const debasementReputationWindowYears = 3;
+export const debasementReputationMaxCount = 3;
+export function debasementCountInWindow(gameYears: readonly number[], currentYear: number): number {
+  if (!Number.isSafeInteger(currentYear) || currentYear < 1) return 0;
+  const oldest = currentYear - (debasementReputationWindowYears - 1);
+  let n = 0;
+  for (const year of gameYears) {
+    const y = Math.floor(Number(year) || 0);
+    if (y >= oldest && y <= currentYear) n += 1;
+  }
+  return n;
+}
+export function withDebasementReputation<T extends WorldReputationScore>(
+  map: Readonly<Record<TreatyNationId, T>>,
+  count: number,
+): Record<TreatyNationId, T & { debasements: number }> {
+  const n = Math.max(0, Math.min(debasementReputationMaxCount, Math.floor(Number(count) || 0)));
+  return {
+    kindle: { ...map.kindle, debasements: 0 },
+    korund: { ...map.korund, debasements: 0 },
+    aurelle: { ...map.aurelle, score: (map.aurelle?.score ?? 0) + debasementReputationPenalty * n, debasements: n },
+  };
 }
 
 

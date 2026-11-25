@@ -1,9 +1,8 @@
 /** #1492: with the anti-snowball flag on, GET /api/world/registry refuses no-capital and no-nation viewers on both the bare and per-square paths. Flag off is unchanged. */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 
 const FLAG = 'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED';
 const listed = (r, user, query = '') => r.call('world/registry', user, undefined, 'https://fixture.invalid', query);
@@ -74,18 +73,6 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (files, pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
-
 test('#1492 mutations: a bare GET d=0 no-capital listing, lumping no-nation into no_capital, and refusing when the flag is off all fail', () => {
   const file = 'tests/registry-get-refusals-1492.test.mjs';
   const cases = [
@@ -108,11 +95,14 @@ test('#1492 mutations: a bare GET d=0 no-capital listing, lumping no-nation into
       pattern: 'flag off is unchanged',
     },
   ];
-  for (const c of cases) {
-    const restore = mutate(c.target, c.find, c.replace);
-    try {
-      const result = run([file], c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
-    } finally { restore(); }
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const restore = tree.mutate(c.target, c.find, c.replace);
+      try {
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
+      } finally { restore(); }
+    }
+  } finally { tree.close(); }
 });
