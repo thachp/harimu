@@ -21,7 +21,7 @@ const iso=ms=>new Date(Math.floor(ms/1000)*1000).toISOString().replace(/\.\d{3}Z
 
 test('flag is preview true, production false, GRAY 93 at index 92',()=>{
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),92);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,94);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,96);
   const preview=JSON.parse(readFileSync('wrangler.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   const prod=JSON.parse(readFileSync('wrangler.prod.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   assert.equal(preview.vars[FLAG],undefined);
@@ -30,7 +30,7 @@ test('flag is preview true, production false, GRAY 93 at index 92',()=>{
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG],'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG),92);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG),92);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length,94);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length,96);
 });
 
 test('migration 0132 is additive and matches the test schema',()=>{
@@ -130,10 +130,10 @@ test('Korund and Aurelle actions are refused and their editions have no player a
   for(const nation of ['korund','aurelle']){
     await r.db.prepare('UPDATE citizens SET nation_id=? WHERE clerk_user_id=?').bind(nation,'bob').run();
     const found=await post(r,'bob',{action:'found-paper',requestId:randomUUID(),name:'Harbor Ledger'});
-    assert.equal(found.status,403,nation);
-    assert.equal(found.data.error,kindleNewspaperNationError);
+    if(nation==='aurelle'){assert.equal(found.status,404,nation);assert.equal(found.data.error,'Aurelle broadsheets are not available yet.');}
+    else{assert.equal(found.status,403,nation);assert.equal(found.data.error,kindleNewspaperNationError);}
     const published=await post(r,'bob',{action:'publish',requestId:randomUUID(),headline:'Shifts posted',paragraphs:['One paragraph of news.']});
-    assert.equal(published.status,403,nation);
+    assert.equal(published.status,nation==='aurelle'?404:403,nation);
     const edition=await get(r,'bob');
     assert.equal(edition.status,200,nation);
     assert.ok(edition.data.items.every(i=>i.kind!=='player-article'),nation);

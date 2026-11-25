@@ -141,7 +141,7 @@ export const wearinessConfig = {
   baseUnrestPerWeek: 2,
   /** [ASSUMPTION] Docs: more in Kindle, less in Korund; Aurelle sits between. Hoarvale, Veldwood, Varkand and Fulmara are not MVP nations and have no entry. */
   nationMultiplier: { kindle: 1.5, aurelle: 1, korund: 0.5 } as Readonly<Record<WarNationId, number>>,
-  /** [ASSUMPTION] Lost frontier squares and casualties speed it up: +1 per lost square and +1 per 10 casualties, each capped. Nothing tracks either yet, so callers pass zero. */
+  /** [ASSUMPTION] Lost frontier squares and casualties speed it up: +1 per lost square and +1 per 10 casualties, each capped. Callers pass counts from lib/war-weariness.ts (#495 lost squares, #1481 army_wounds casualties). */
   perLostSquare: 1, lostSquareCap: 10, casualtiesPerPoint: 10, casualtyCap: 10,
   /** [ASSUMPTION] One war can add at most this much Unrest in total (the stability score also clamps to what is left under 100). */
   totalCap: 40,

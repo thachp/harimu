@@ -1,6 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { flagOn } from './flag-pack.mjs';
-import { mapHeight, mapWidth, onGrid, type Zone } from './map-zones';
+import { mapHeight, mapWidth, mvpNations, onGrid, type Zone } from './map-zones.ts';
 import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-exchange';
 
 /**
@@ -11,37 +11,94 @@ import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-
  * Tessera source (#210): citizens buy Tessera with Spark at the Clearing House kiosk (lib/tessera-exchange.ts).
  * The temporary 50.00 TSR starter grant is removed; 'starter-grant' rows already written stay in the ledger as history.
  *
- * #1349: HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED (docs §15.1 [ASSUMPTION]) prices a square at
- * round(squarePriceMinor × (1 + owned/1000)) minor units. With the flag on, `owned` is how many world_squares
- * the buyer's nation already owns, counted inside the purchase INSERT. Rounding is nearest, half up, and the
- * result is at least 1. Flag off: the price stays squarePriceMinor. This flag does not open the registry.
+ * #1349 / #1482: HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED (docs §15.1 [ASSUMPTION]) prices a square at
+ * round(squarePriceMinor × (1 + owned/1000) × (1 + d/50)) minor units, where d is Chebyshev distance from the
+ * square to the buying nation's capital (`mvpNations`; same metric as lib/map-zones.ts). With the flag on, `owned`
+ * is how many world_squares the buyer's nation already owns, counted inside the purchase INSERT; d is a pure
+ * function of (x, y, nation) and is bound into that INSERT. Rounding is nearest, half up, and the result is at least 1.
+ * At d = 0 the price matches the #1349 owned-only term. Flag off: the price stays squarePriceMinor. This flag does not open the registry.
  */
 export const squarePriceMinor = 2500; // 25.00 TSR
+/** #1482 [ASSUMPTION]: docs §15.1 give no distance figure; 1/50 per square (a square 10 out costs 20% more). */
+export const squareDistanceDivisor = 50;
 export const registryNations = ['kindle', 'korund', 'aurelle'] as const;
 /** In HARIMU_GRAY_PACK (preview "true", production "false"); a direct env string wins. Exactly "true" is on. */
 export const squarePriceAntiSnowballEnabled = (env: unknown) => flagOn(env, 'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED');
 
-/** Nearest minor unit, half up, at least 1. `owned` is clamped to a non-negative integer. */
-export function squareChargeMinor(owned: number): number {
+/** Capital of a live map nation, or null if that nation has none in mvpNations. */
+export function nationCapital(nationId: string): { x: number; y: number } | null {
+  return mvpNations.find(n => n.id === nationId)?.capital ?? null;
+}
+
+export const noCapitalError = 'The World Registry cannot price a square for a nation without a capital.';
+export const noNationError = 'Only Kindle, Korund and Aurelle citizens can buy squares in this preview.';
+export const purchaseBadRequestError = 'Send action "buy-square", integer x/y and a requestId.';
+export const purchaseOutOfBoundsError = 'That square is off the map.';
+
+/** Chebyshev distance from (x, y) to the nation's capital. No capital: null (callers must fail closed; never fall back to 0). */
+export function squareCapitalDistance(nationId: string, x: number, y: number): number | null {
+  const capital = nationCapital(nationId);
+  if (!capital) return null;
+  return Math.max(Math.abs(x - capital.x), Math.abs(y - capital.y));
+}
+
+/** Parse GET /api/world/registry x/y the same way a purchase treats coordinates: missing both is "no square"; anything else must be two integers on the map. */
+export function parseRegistrySquareQuery(x: string | null, y: string | null):
+  | { ok: true; at?: { x: number; y: number } }
+  | { ok: false; status: 400; reason: 'bad_request' | 'out_of_bounds'; error: string } {
+  if (x === null && y === null) return { ok: true };
+  if (x === null || y === null || !/^-?\d+$/.test(x) || !/^-?\d+$/.test(y)) {
+    return { ok: false, status: 400, reason: 'bad_request', error: purchaseBadRequestError };
+  }
+  const xi = Number(x), yi = Number(y);
+  if (xi < 0 || yi < 0 || xi >= mapWidth || yi >= mapHeight) return { ok: false, status: 400, reason: 'out_of_bounds', error: purchaseOutOfBoundsError };
+  return { ok: true, at: { x: xi, y: yi } };
+}
+
+/** Nearest minor unit, half up, at least 1. `owned` and `distance` are clamped to non-negative integers. */
+export function squareChargeMinor(owned: number, distance = 0): number {
   const count = Number.isSafeInteger(owned) && owned > 0 ? owned : 0;
-  const price = Math.floor((squarePriceMinor * (1000 + count) + 500) / 1000);
+  const d = Number.isSafeInteger(distance) && distance > 0 ? distance : 0;
+  const price = Math.floor((squarePriceMinor * (1000 + count) * (squareDistanceDivisor + d) + 500 * squareDistanceDivisor) / (1000 * squareDistanceDivisor));
   return price > 0 ? price : 1;
 }
-/** Same half-up price inside one statement. `?` is the nation id. Counted at insert time, so a second same-nation buy cannot reuse a stale pre-read. */
-export const squareLivePriceSql = `((${squarePriceMinor}*(1000+(SELECT COUNT(*) FROM world_squares WHERE owner=?))+500)/1000)`;
+/** Same half-up price inside one statement. First `?` is the nation id (counted at insert time); second `?` is d. */
+export const squareLivePriceSql = `CAST((${squarePriceMinor}*(1000+(SELECT COUNT(*) FROM world_squares WHERE owner=?))*(${squareDistanceDivisor}+?)+${500 * squareDistanceDivisor})/${1000 * squareDistanceDivisor} AS INTEGER)`;
 
 async function ownedSquareCount(db: GameDatabase, nationId: string): Promise<number> {
   const row = await db.prepare('SELECT COUNT(*) AS n FROM world_squares WHERE owner=?').bind(nationId).first<{ n: number }>();
   return Number(row?.n ?? 0);
 }
 
-/** Listed price for a signed-in citizen. Flag off returns squarePriceMinor and does not read world_squares. */
-export async function registryPriceMinor(db: GameDatabase, userId: string, env: unknown): Promise<number> {
+/** Listed price for a signed-in citizen. Flag off returns squarePriceMinor and does not read world_squares.
+ *  #1482: when `at` is a square, the price includes Chebyshev distance to the citizen's capital; without it the d = 0 term is listed. */
+export async function registryPriceMinor(db: GameDatabase, userId: string, env: unknown, at?: { x: number; y: number }): Promise<number> {
   if (!squarePriceAntiSnowballEnabled(env)) return squarePriceMinor;
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id;
-  if (!nationId) return squareChargeMinor(0);
-  return squareChargeMinor(await ownedSquareCount(db, nationId));
+  // Without `at`, list the d = 0 term (owned only). registryListingPrice has already refused a missing nation or capital when the flag is on.
+  const distance = nationId && at ? squareCapitalDistance(nationId, at.x, at.y) : 0;
+  if (distance === null) throw new Error('registryPriceMinor requires a capital when a square is given');
+  if (!nationId) return squareChargeMinor(0, distance);
+  return squareChargeMinor(await ownedSquareCount(db, nationId), distance);
+}
+
+export type RegistryListingResult =
+  | { ok: true; priceMinor: number }
+  | { ok: false; status: 400 | 403; reason: string; error: string };
+
+/** GET listing price. Non-integer or off-map x/y is the same 400 as a purchase.
+ *  Flag on: no nation is 403 no_nation (both bare and per-square), matching purchase; no capital is 403 no_capital, including a bare GET. Flag off does not require a nation or capital. */
+export async function registryListingPrice(db: GameDatabase, userId: string, env: unknown, x: string | null, y: string | null): Promise<RegistryListingResult> {
+  const parsed = parseRegistrySquareQuery(x, y);
+  if (!parsed.ok) return parsed;
+  if (squarePriceAntiSnowballEnabled(env)) {
+    const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
+    const nationId = citizen?.nation_id ?? null;
+    if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return { ok: false, status: 403, reason: 'no_nation', error: noNationError };
+    if (nationCapital(nationId) === null) return { ok: false, status: 403, reason: 'no_capital', error: noCapitalError };
+  }
+  return { ok: true, priceMinor: await registryPriceMinor(db, userId, env, parsed.at) };
 }
 
 export const worldRegistrySchemas = [
@@ -88,7 +145,7 @@ const zoneReason: Record<Exclude<Zone, 'wildlands'>, string> = {
 
 /** Pure eligibility check (no debit): bounds, zone, ownership and adjacency to the nation's land. */
 export function checkPurchaseSite(squares: readonly Square[], nationId: string, x: number, y: number): PurchaseResult | null {
-  if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) return fail(400, 'out_of_bounds', 'That square is off the map.');
+  if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) return fail(400, 'out_of_bounds', purchaseOutOfBoundsError);
   const square = squares.find(s => s.x === x && s.y === y);
   if (!square) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   if (square.zone === 'heartland' || square.zone === 'commons') return fail(409, square.zone, zoneReason[square.zone]);
@@ -109,7 +166,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   if (!enabled) return fail(403, 'disabled', 'The World Registry is not open yet.');
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id ?? null;
-  if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return fail(403, 'no_nation', 'Only Kindle, Korund and Aurelle citizens can buy squares in this preview.');
+  if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return fail(403, 'no_nation', noNationError);
   const prior = await db.prepare('SELECT clerk_user_id,nation_id,x,y,price_minor FROM world_square_purchases WHERE request_id=?').bind(command.requestId)
     .first<{ clerk_user_id: string; nation_id: string; x: number; y: number; price_minor: number }>();
   if (prior) {
@@ -146,12 +203,17 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
     if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
     return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor: squarePriceMinor, tesseraMinor: await readTessera(db, userId) };
   }
+  // d comes from the stored square row and the buyer's capital at purchase time; never from the client.
+  const stored = squares.find(s => s.x === x && s.y === y);
+  if (!stored) return fail(409, 'map_unavailable', 'The world map is not available right now.');
+  const distance = squareCapitalDistance(nationId, stored.x, stored.y);
+  if (distance === null) return fail(403, 'no_capital', noCapitalError);
   await db.batch([
     db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
       SELECT ?,?,?,?,?,${squareLivePriceSql},? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
       AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
       AND ${balanceSql} >= ${squareLivePriceSql}
-      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, nationId, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), nationId),
+      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, nationId, distance, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), nationId, distance),
     db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
       SELECT ?,?,-price_minor,'square-purchase',? FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?
       ON CONFLICT DO NOTHING`)
@@ -161,7 +223,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   ]);
   const created = await db.prepare('SELECT price_minor FROM world_square_purchases WHERE request_id=?').bind(requestId).first<{ price_minor: number }>();
   if (!created) {
-    const livePrice = squareChargeMinor(await ownedSquareCount(db, nationId));
+    const livePrice = squareChargeMinor(await ownedSquareCount(db, nationId), distance);
     const liveBalance = await readTessera(db, userId);
     if (liveBalance < livePrice) return fail(409, 'insufficient_tessera', `A square costs ${(livePrice / 100).toFixed(2)} TSR; you hold ${(liveBalance / 100).toFixed(2)} TSR.`);
     return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');

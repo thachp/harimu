@@ -45,6 +45,21 @@ export const foreignAffairsPanel={
  proposal:true,
 } as const;
 
+/** #1474 / #1480: the viewer's World Reputation score and the broken-treaty record behind it.
+ *  `{score}`, `{count}`, `{pacts}`, `{treaty}`, `{nation}`, `{day}`, and `{penalty}` are filled by the panel.
+ *  `pact`/`pacts` and `break`/`breaks` pick the singular. Score 0 keeps `zero` and shows no record. */
+export const reputationPanel={
+ line:L('World Reputation: {score} ({count} {pacts})'),
+ zero:L('No broken treaties on record'),
+ record:L('{treaty} with {nation}, broken on day {day} ({penalty})'),
+ earlier:L('and {count} earlier {breaks}'),
+ pact:'broken pact',
+ pacts:'broken pacts',
+ break:'break',
+ breaks:'breaks',
+ proposal:true,
+} as const;
+
 /** One line per kind of treaty, from §13.2. `name` is the pre-formatted {treaty} value #308 is expected to pass. */
 export const treatyKinds:Readonly<Record<TreatyKind,{name:string;effect:Line}>>={
  'non-aggression':{name:'non-aggression pact',effect:L('No war declarations between the signatories.')},

@@ -248,7 +248,11 @@
       // #1453: Kindle citizens may found a newspaper and publish bylined articles (docs §18.2, §18.4). Off: both actions are refused, GET /api/news is unchanged, and kindle_articles is not queried.
       "HARIMU_KINDLE_NEWSPAPERS_ENABLED": "true",
       // #1359: Aurelle noble ranks from lifetime earned Royal Favor (docs §11.6). Off: no aurelleRank field and no card. GRAY 94.
-      "HARIMU_AURELLE_RANKS_ENABLED": "true"
+      "HARIMU_AURELLE_RANKS_ENABLED": "true",
+      // #1469: Korund State Media writers file kit-only articles (docs §18.2). Off: the action is refused, GET /api/news is unchanged, and korund_state_media_articles is not queried. GRAY 95.
+      "HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED": "true",
+      // #1475: an Aurelle citizen may found one broadsheet and publish bylined articles in the Court Gazette (docs §18.2, §18.4). Off: the action is refused, GET /api/news is unchanged, and kindle_articles is not queried. GRAY 96 (index 95), after Korund State Media writers.
+      "HARIMU_AURELLE_BROADSHEETS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
@@ -492,7 +496,8 @@
       "NEXT_PUBLIC_HARIMU_DESKTOP_GATE": "true",
       "NEXT_PUBLIC_HARIMU_MILITARY": "true",
       "NEXT_PUBLIC_HARIMU_ECONOMY": "true",
-      "NEXT_PUBLIC_HARIMU_FAITH": "true"
+      "NEXT_PUBLIC_HARIMU_FAITH": "true",
+      "NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",

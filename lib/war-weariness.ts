@@ -1,5 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
+import { BATTLE_ROUND_SECONDS } from './army-battle.ts';
+import { unitById } from './army-rules.ts';
 import { WEARINESS_WEEK_SECONDS, warNations, warWearinessUnrest, warWeeksAtWar, wearinessLevel, type WarNationId, type WearinessLevelId } from './war-rules';
 
 /** #423: war weariness behind HARIMU_WAR_ENABLED and HARIMU_WAR_WEARINESS_ENABLED (both default "false"). Docs 15.3. Rules and numbers: lib/war-rules.ts.
@@ -17,8 +19,9 @@ type Row = { id: string; attacker_nation: WarNationId; defender_nation: WarNatio
  *  #495: with `losses` on, the frontier squares a nation lost to city captures in those wars during the rolling week before `asOf` (captured_at in (asOf-WEARINESS_WEEK_SECONDS, asOf], docs 15.3
  *  "that week", ARC ruling on #495) feed the capped add-on, netted against the squares the same nation truly recaptured in those wars in the same window, floored at 0.
  *  A recapture is a square moved to the nation (`city_capture_squares.to_nation`) that an earlier capture had taken from it (`from_nation`); taking an enemy's own square does not net.
- *  Squares a holder privately kept are not lost (`squares_kept_private` is not counted). Casualties still read zero: nothing in the game records them, and the copy rules ban casualty talk.
- *  Read-only SELECTs; a database without the wars or capture table reads as none. */
+ *  Squares a holder privately kept are not lost (`squares_kept_private` is not counted).
+ *  #1481: with the same `losses` switch, each `army_wounds` row whose battle belongs to those wars and ended in the same window (`started_at + rounds * BATTLE_ROUND_SECONDS` in (asOf-WEARINESS_WEEK_SECONDS, asOf], mirroring the #664 "that week" ruling) is one casualty, charged to the destroyed unit's nation (the `retreated` side). The winning side is not charged. A database without army_battles or army_wounds reads as zero casualties.
+ *  Public copy stays a level word; it never names a casualty count. Read-only SELECTs; a database without the wars or capture table reads as none. */
 export async function readWarWeariness(db: GameDatabase, asOf: number, options: WearinessOptions = {}): Promise<Record<WarNationId, number>> {
   const out = Object.fromEntries(warNations.map(nation => [nation, 0])) as Record<WarNationId, number>;
   const rows = await db.prepare('SELECT id,attacker_nation,defender_nation,mobilization_ends_at,ended_at FROM wars WHERE mobilization_ends_at<=? AND (ended_at IS NULL OR ended_at>?)')
@@ -30,6 +33,7 @@ export async function readWarWeariness(db: GameDatabase, asOf: number, options: 
     if (warNations.includes(row.defender_nation)) weeks[row.defender_nation] += w;
   }
   const lost = Object.fromEntries(warNations.map(nation => [nation, 0])) as Record<WarNationId, number>;
+  const casualties = Object.fromEntries(warNations.map(nation => [nation, 0])) as Record<WarNationId, number>;
   if (options.losses && rows.results.length > 0) {
     const marks = rows.results.map(() => '?').join(',');
     type Sum = { nation: string; squares: number | string | null };
@@ -43,8 +47,18 @@ export async function readWarWeariness(db: GameDatabase, asOf: number, options: 
     const add = (list: Sum[], sign: number) => { for (const row of list) if ((warNations as readonly string[]).includes(row.nation)) lost[row.nation as WarNationId] += sign * Number(row.squares ?? 0); };
     add(losses.results, 1); add(gains.results, -1);
     for (const nation of warNations) lost[nation] = Math.max(0, lost[nation]);
+    type Wound = { retreated: string; attacker_unit: string; defender_unit: string; n: number | string | null };
+    const woundNone = tolerate(isMissingRelation, { results: [] as Wound[] });
+    const woundRows = await db.prepare(`SELECT b.retreated, b.attacker_unit, b.defender_unit, COUNT(*) AS n FROM army_wounds w JOIN army_battles b ON b.battle_key=w.battle_key
+      WHERE b.started_at+b.rounds*? > ? AND b.started_at+b.rounds*? <= ? AND b.war_id IN (${marks}) AND b.retreated IN ('attacker','defender') GROUP BY b.retreated, b.attacker_unit, b.defender_unit`)
+      .bind(BATTLE_ROUND_SECONDS, from, BATTLE_ROUND_SECONDS, asOf, ...ids).all<Wound>().catch(woundNone);
+    for (const row of woundRows.results) {
+      const unitId = row.retreated === 'attacker' ? row.attacker_unit : row.retreated === 'defender' ? row.defender_unit : null;
+      const nation = unitId ? unitById(unitId)?.nationId : undefined;
+      if (nation && (warNations as readonly string[]).includes(nation)) casualties[nation as WarNationId] += Number(row.n ?? 0);
+    }
   }
-  for (const nation of warNations) out[nation] = warWearinessUnrest(nation, weeks[nation], { lostSquares: lost[nation] });
+  for (const nation of warNations) out[nation] = warWearinessUnrest(nation, weeks[nation], { lostSquares: lost[nation], casualties: casualties[nation] });
   return out;
 }
 /** #427 slice 3: Kindle's weariness points for the Assembly's war and ending votes, read at decision time. Zero unless the weariness flag is on (then the vote is unchanged). */

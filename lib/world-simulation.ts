@@ -24,7 +24,8 @@ import { recordFinishedBattles } from './army-battle';
 import { readHarmonyScores } from './religious-harmony';
 import { readWars, type WarState } from './war'; // #309
 import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
-import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
+import { readTreaties, readWorldReputation, runDiplomacy, type TreatyState } from './diplomacy'; // #308, #1477
+import type { WorldReputationMap } from './diplomacy-rules'; // #1474
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
 import { decideProposedGoodsSanctions } from './goods-sanctions'; // #601
 import { decideKindleWarProposals, readWarProposals } from './war-assembly'; // #427
@@ -80,7 +81,7 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard; warProposals?: Awaited<ReturnType<typeof readWarProposals>>; warEndings?: Awaited<ReturnType<typeof readWarEndings>> };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; reputation?: WorldReputationMap; embargoes?: EmbargoState; reserve?: ReserveBoard; warProposals?: Awaited<ReturnType<typeof readWarProposals>>; warEndings?: Awaited<ReturnType<typeof readWarEndings>> };
 
 type RunnerOptions = Parameters<typeof advanceWorld>[2];
 /** #679: one flag-gated world runner. `run` is only called when its flag is on. */
@@ -215,7 +216,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
   const atlasCancelsOn = options.atlasEnv != null
     && flagOn(options.atlasEnv, 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED')
     && varkandAlertEnabled(options.atlasEnv);
-  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,embargoes,reserve,warProposals,warEndings,atlasAlert] = await Promise.all([
+  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,reputation,embargoes,reserve,warProposals,warEndings,atlasAlert] = await Promise.all([
     db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')
@@ -227,6 +228,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     options.war ? readSiegeSnapshot(db,now) : none,
     options.war && options.warWeariness ? readPublicWeariness(db,now,{ losses: options.warWearinessLosses }) : none,
     options.diplomacy ? readTreaties(db,now) : none,
+    options.diplomacy ? readWorldReputation(db, now) : none, // #1477/#1480: uncapped count and record, not the LIMIT 20 list
     options.embargo ? readEmbargoes(db) : none,
     options.reserve ? readReserveBoard(db,now) : none,
     options.war && options.warAssembly ? readWarProposals(db) : none, // #427: the Assembly's pending and recent votes, read-only
@@ -242,5 +244,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     ...(dividendDayAt == null ? {} : { dividendDayAt }), ...worldAtlasClockFields(now, options.atlasEnv, canceledNames)}, // #1193/#1239: atlasEnv is the Worker env; flag off adds nothing; canceledNames skips Red Alert celebrations
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!,reputation:reputation!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
 }

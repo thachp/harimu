@@ -8,7 +8,7 @@ import {ownerPrefix} from './notables';
 import {newsEditionOptions,readNationalNews} from './national-news';
 import {readAiNews,withAiNews} from './ai-news';
 import {aiTemplatesOnly} from './ai-kill-switch';
-import {KINDLE_NEWSPAPERS_FLAG,readKindlePlayerArticles} from './kindle-newspapers';
+import {KINDLE_NEWSPAPERS_FLAG,readPlayerArticles} from './kindle-newspapers';
 import {flagOn} from './flag-pack.mjs';
 
 export const reportDailyLimit=10;
@@ -34,7 +34,7 @@ async function aiNewsVisible(db:GameDatabase,userId:string,nationId:string,targe
 }
 async function playerArticleVisible(db:GameDatabase,userId:string,nationId:string,targetId:string){
  if(nationId!=='kindle'||!flagOn(env,KINDLE_NEWSPAPERS_FLAG))return false;
- const items=await readKindlePlayerArticles(db,userId,(env as {HARIMU_CHAT_SHADOW_MUTE?:unknown}).HARIMU_CHAT_SHADOW_MUTE);
+ const items=await readPlayerArticles(db,'kindle',userId,(env as {HARIMU_CHAT_SHADOW_MUTE?:unknown}).HARIMU_CHAT_SHADOW_MUTE);
  return items.some(row=>row.id.toLowerCase()===targetId);
 }
 async function targetVisible(db:GameDatabase,userId:string,nationId:string,kind:ReportKind,targetId:string,now:number){
