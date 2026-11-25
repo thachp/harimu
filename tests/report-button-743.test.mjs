@@ -52,6 +52,19 @@ test('the square and Notable GETs say whether reports are on', async t => {
     assert.equal((await r.call('notables', 'alice')).data.reportsEnabled, on);
   }
 });
+test('AI addresses and AI news use the #457 labels and show the AI-only reason; player articles have no button', async () => {
+  assert.equal(harness('ai-leader-address', []).render().props.children, copy.reportTargetFor('ai-leader-address').entryLabel);
+  assert.equal(harness('ai-news', []).render().props.children, copy.reportTargetFor('ai-news').entryLabel);
+  for (const kind of ['ai-leader-address', 'ai-news']) {
+    const h = harness(kind, [true]);
+    assert.ok(h.all(h.render()).some(n => n?.props?.value === 'ai-inappropriate'));
+  }
+  const addresses = await readFile(new URL('../app/weekly-addresses.tsx', import.meta.url), 'utf8');
+  const news = await readFile(new URL('../app/national-news.tsx', import.meta.url), 'utf8');
+  assert.match(addresses, /\{reportsEnabled&&<ReportButton kind="ai-leader-address" targetId=\{address\.id\}\/>\}/);
+  assert.match(news, /\{\(news\.reportsEnabled===true&&\(item\.source==='model'\|\|item\.source==='deterministic'\)\)&&<ReportButton kind="ai-news" targetId=\{item\.id\}\/>\}/);
+  assert.doesNotMatch(`${addresses}\n${news}\n${await readFile(new URL('../app/report-button.tsx', import.meta.url), 'utf8')}`, /kind="player-article"/);
+});
 test('the Notable transcript offers Report only on model replies and only when reports are on', async () => {
   const source = await readFile(new URL('../app/notable-control.tsx', import.meta.url), 'utf8');
   assert.match(source, /\{reports&&turn\.model===true&&<ReportButton kind="notable-reply" targetId=\{turn\.id\}\/>\}/);

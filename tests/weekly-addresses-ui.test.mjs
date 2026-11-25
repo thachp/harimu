@@ -11,7 +11,7 @@ const action={};new Function('exports','require',await compile('action-button.ts
 const tags={};new Function('exports','require',await compile('ai-disclosure.tsx'))(tags,require);
 const documents={};new Function('exports','require',await compile('nation-document.tsx'))(documents,name=>name==='../lib/nation-themes'?require('../lib/nation-themes.ts'):require(name));
 const compiled=await compile('weekly-addresses.tsx');
-const imports=name=>name==='./nation-document'?documents:name==='./action-button'?action:name==='./ai-disclosure'?tags:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:require(name);
+const imports=name=>name==='./nation-document'?documents:name==='./action-button'?action:name==='./ai-disclosure'?tags:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:name==='./report-button'?{ReportButton:()=>null}:require(name);
 const real={};new Function('exports','require',compiled)(real,imports);
 const address={id:'kindle:address:0',week:0,scheduledAt:100,publishedAt:101,leaderName:'Ines Varro',office:'President',title:'Public institutions',transcript:'Authored fixture transcript. No outcome is announced.',provenance:'authored-poc',agree:0,disagree:0,ownReaction:null};
 test('authored transcripts show portrait, truthful provenance, actual counts and linked disabled reasons',()=>{

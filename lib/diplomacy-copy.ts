@@ -60,6 +60,14 @@ export const reputationPanel={
  proposal:true,
 } as const;
 
+/** #1487: the viewer's Nation Legitimacy, derived from the same broken treaties as World Reputation.
+ *  `{score}` is filled by the panel. Score 0 keeps `zero`. There is no second record list. */
+export const legitimacyPanel={
+ line:L('Legitimacy: {score}'),
+ zero:L('No legitimacy losses on record'),
+ proposal:true,
+} as const;
+
 /** One line per kind of treaty, from §13.2. `name` is the pre-formatted {treaty} value #308 is expected to pass. */
 export const treatyKinds:Readonly<Record<TreatyKind,{name:string;effect:Line}>>={
  'non-aggression':{name:'non-aggression pact',effect:L('No war declarations between the signatories.')},
@@ -92,6 +100,9 @@ export const treatyStatusLines:Readonly<Record<TreatyStatus,readonly Line[]>>={
 
 /** One line for a broken non-aggression pact: names the cost, never a number (§13.2). */
 export const brokenPactLine=L('The pact between {nationA} and {nationB} was broken. Breaking it costs Legitimacy and global Reputation.');
+
+/** #1490: short tag on a renewed in-force trade agreement. Placeholder for Content. */
+export const treatyRenewalTag=L('Renewed');
 
 /** Ratification news: each names its own ratifying body (§13.1). The Kindle Assembly has one variant for the treaty vote and one for
  * the trade vote. Headlines are fixed (no placeholder) so they stay within 40 characters at any name length. */

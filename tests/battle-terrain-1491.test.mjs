@@ -1,6 +1,6 @@
 /** #1491: the attacker's staging square adds its terrain to the defender's battle bonus (docs §15.3). No migration.
- *  Flag HARIMU_BATTLE_TERRAIN_ENABLED, assigned GRAY 98 (index 97, after #1490). The pack is dense and #1490 is not on dev,
- *  so indexOf stays 96 until HARIMU_TRADE_RENEWAL_ENABLED is inserted ahead of this flag. Needs army battles. Flag off: the response and the card stay byte-identical. */
+ *  Flag HARIMU_BATTLE_TERRAIN_ENABLED, GRAY 98 (index 97), directly after HARIMU_TRADE_RENEWAL_ENABLED (GRAY 97, index 96).
+ *  Needs army battles. Flag off: the response and the card stay byte-identical. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -48,17 +48,20 @@ test('terrain tiers, a 35% maximum, bonus 0 matches today, hills beats plains, a
   assert.match(readFileSync('app/army-card.tsx', 'utf8'), /\{unit\.battle\?\.terrain && <p>\{battleGroundLine\(unit\.battle\)\}<\/p>\}/);
 });
 
-test('the flag is preview true, production false, assigned GRAY 98, dense index 96 until #1490, and listed in previewOnFlags', () => {
+test('the flag is preview true, production false, GRAY 98 at index 97, and listed in previewOnFlags', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_BROADSHEETS_ENABLED'), 95);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 96, 'no hole: index 97 once #1490 takes GRAY 97');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 97);
   const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 96);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 96);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 97);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 97);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, FLAG), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, FLAG), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [FLAG]: 'false' }, FLAG), false);
