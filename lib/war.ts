@@ -69,7 +69,7 @@ export function presentKorundWorldSimulation<T extends {
   warProposals?: readonly { defender: string; warId?: string | null }[];
   warEndings?: readonly { warId: string; proposer: string; other: string }[];
   weariness?: Partial<Record<string, string>>;
-  reputation?: Partial<Record<string, { score: number; brokenPacts: number; record?: { other: string; kind: string; brokenAt: number; brokenGameDay: number; penalty: number }[]; earlierBreaks?: number; legitimacy?: number }>>;
+  reputation?: Partial<Record<string, { score: number; brokenPacts: number; record?: { other: string; kind: string; brokenAt: number; brokenGameDay: number; penalty: number }[]; earlierBreaks?: number; legitimacy?: number; debasements?: number }>>;
 }>(simulation: T, nationId: string | null | undefined): T {
   if (nationId !== 'korund') return simulation;
   if (!simulation.wars && !simulation.sieges && !simulation.treaties && !simulation.embargoes && !simulation.warProposals && !simulation.warEndings && !simulation.weariness && !simulation.reputation) return simulation;

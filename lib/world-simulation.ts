@@ -228,7 +228,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     options.war ? readSiegeSnapshot(db,now) : none,
     options.war && options.warWeariness ? readPublicWeariness(db,now,{ losses: options.warWearinessLosses }) : none,
     options.diplomacy ? readTreaties(db,now) : none,
-    options.diplomacy ? readWorldReputation(db, now) : none, // #1477/#1480: uncapped count and record, not the LIMIT 20 list
+    options.diplomacy ? readWorldReputation(db, now, { debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }) : none, // #1477/#1480/#1496: uncapped count and record, not the LIMIT 20 list
     options.embargo ? readEmbargoes(db) : none,
     options.reserve ? readReserveBoard(db,now) : none,
     options.war && options.warAssembly ? readWarProposals(db) : none, // #427: the Assembly's pending and recent votes, read-only

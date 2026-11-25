@@ -68,6 +68,11 @@ export const legitimacyPanel={
  proposal:true,
 } as const;
 
+/** #1496: Aurelle-only line under World Reputation. `{n}` is the in-window decree count. Shown only when n > 0. */
+export const debasementReputationPanel={
+ line:L('Crown debasements in the last 3 years: {n}'),
+} as const;
+
 /** One line per kind of treaty, from §13.2. `name` is the pre-formatted {treaty} value #308 is expected to pass. */
 export const treatyKinds:Readonly<Record<TreatyKind,{name:string;effect:Line}>>={
  'non-aggression':{name:'non-aggression pact',effect:L('No war declarations between the signatories.')},

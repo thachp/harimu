@@ -2,7 +2,7 @@
 import type { PublicTreaty } from '@/lib/diplomacy';
 import type { WorldReputation } from '@/lib/diplomacy-rules';
 import type { PublicEmbargo } from '@/lib/embargo';
-import { foreignAffairsPanel, legitimacyPanel, reputationPanel, treatyKinds as treatyKindCopy, treatyRenewalTag, treatyStatusLines } from '@/lib/diplomacy-copy';
+import { debasementReputationPanel, foreignAffairsPanel, legitimacyPanel, reputationPanel, treatyKinds as treatyKindCopy, treatyRenewalTag, treatyStatusLines } from '@/lib/diplomacy-copy';
 import { embargoPress, embargoPrivate } from '@/lib/embargo-copy'; // #363
 import { isTreatyNation, treatyKindNames, treatyNationNames } from '@/lib/diplomacy-rules';
 import { useDisplayTimestamp } from './display-preferences';
@@ -34,10 +34,13 @@ export function ForeignAffairsPanel({ treaties, embargoes, reputation, nationId 
   const legitimacyLine = reputation
     ? (legitimacyScore === 0 ? legitimacyPanel.zero.text : fill(legitimacyPanel.line.text, { score: legitimacyLabel }))
     : null;
+  const debasementCount = nationId === 'aurelle' ? (reputation?.debasements ?? 0) : 0;
+  const debasementLine = debasementCount > 0 ? fill(debasementReputationPanel.line.text, { n: String(debasementCount) }) : null;
   return <section aria-label="Foreign affairs">
     <h4>{foreignAffairsPanel.header}</h4>
     <p>{foreignAffairsPanel.aiNote.text}</p>
     {reputationLine ? <p>{reputationLine}</p> : null}
+    {debasementLine ? <p>{debasementLine}</p> : null}
     {legitimacyLine ? <p>{legitimacyLine}</p> : null}
     {recordItems.length > 0 ? <ul aria-label="Broken-treaty record">{recordItems}</ul> : null}
     {earlierLine ? <p>{earlierLine}</p> : null}
