@@ -9,7 +9,7 @@ export * from './diplomacy-rules';
 
 /** #308: AI treaties PoC (non-aggression pact, trade agreement) behind HARIMU_DIPLOMACY_ENABLED (default "false"). Canon: harimu-docs 13.1, 13.2
  *  (see lib/diplomacy-rules.ts). Treaties are written only by server code (a proposal from the AI leadership path, the world tick that decides
- *  proposals and expires terms): there is no route that proposes, ratifies or breaks one, and no GET writes. Flag off: nothing is created, read or shown. */
+ *  proposals, expires terms, and — when HARIMU_TREATY_BREAK_ENABLED is on — may break one in-force NAP per slot): there is no route that proposes, ratifies or breaks one, and no GET writes. Flag off: nothing is created, read or shown. */
 export const treatySchemas = [
   `CREATE TABLE IF NOT EXISTS treaties (
  id TEXT PRIMARY KEY,
@@ -146,11 +146,22 @@ export async function renewDueTradeAgreements(db: GameDatabase, now: number, opt
   return decided;
 }
 
-/** World tick (HARIMU_DIPLOMACY_ENABLED on): expire due terms, renew due trade agreements when that flag is on, then decide pending proposals. */
-export async function runDiplomacy(db: GameDatabase, now: number, options: { renewal?: boolean; embargo?: boolean } = {}) {
+/** World tick (HARIMU_DIPLOMACY_ENABLED on): expire due terms, renew due trade agreements when that flag is on, break at most one triggered NAP when HARIMU_TREATY_BREAK_ENABLED is on, then decide pending proposals. */
+export async function runDiplomacy(db: GameDatabase, now: number, options: { renewal?: boolean; treatyBreak?: boolean; embargo?: boolean } = {}) {
   await expireDueTreaties(db, now);
   if (options.renewal === true) await renewDueTradeAgreements(db, now, { embargo: options.embargo });
+  if (options.treatyBreak === true) await breakDueNonAggressionPacts(db, now);
   await decideProposedTreaties(db, now);
+}
+
+/** #1507: at most one in-force NAP is broken per treaty slot, only when the counterpart already has an in-force embargo against the breaker. Called from the world tick after expiry (and trade renewal) when HARIMU_TREATY_BREAK_ENABLED is on (and diplomacy is already on). Reuses breakTreaty. Idempotent: a second call in the same slot is a no-op. */
+export async function breakDueNonAggressionPacts(db: GameDatabase, now: number) {
+  const slotStart = treatySlot(now) * treatyProposalSlotSeconds;
+  if (await db.prepare("SELECT 1 AS found FROM treaties WHERE status='broken' AND ended_at>=? AND ended_at<?").bind(slotStart, slotStart + treatyProposalSlotSeconds).first().catch(tolerate(isMissingRelation, null))) return { status: 'already' as const };
+  const row = await db.prepare("SELECT t.id AS id, e.target_nation AS breaker FROM treaties t JOIN embargoes e ON e.status='in_force' AND e.target_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation<>e.target_nation WHERE t.kind='non-aggression' AND t.status='in_force' AND t.ends_at>? ORDER BY t.proposed_at, t.id, e.target_nation LIMIT 1").bind(now).first<{ id: string; breaker: string }>().catch(tolerate(isMissingRelation, null));
+  if (!row || !isTreatyNation(row.breaker)) return { status: 'none' as const };
+  const result = await breakTreaty(db, { treatyId: row.id, breaker: row.breaker }, now, true);
+  return result.ok ? { status: 'broken' as const, treaty: result.treaty } : { status: 'none' as const };
 }
 
 export type BreakTreatyCommand = { treatyId: string; breaker: string };

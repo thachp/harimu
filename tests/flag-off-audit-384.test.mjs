@@ -32,6 +32,7 @@ const flagOffPins = {
   HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED: 'korund-state-media-1469.test.mjs', // #1469 flag off: action refused, no korund_state_media_articles query
   HARIMU_AURELLE_BROADSHEETS_ENABLED: 'aurelle-broadsheets-1475.test.mjs', // #1475 flag off: Aurelle POST refused, no kindle_articles query
   HARIMU_TRADE_RENEWAL_ENABLED: 'trade-renewal-1490.test.mjs', // #1490 flag off: world tick with diplomacy on writes no renewal
+  HARIMU_TREATY_BREAK_ENABLED: 'treaty-breaks-1507.test.mjs', // #1507 flag off: world tick with diplomacy on writes no break
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
