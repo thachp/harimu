@@ -11,8 +11,8 @@ import { worldReputation, treatyBreakPenalty, treatyNations } from '../lib/diplo
 const D = 86_400;
 const zero = { score: 0, brokenPacts: 0 };
 const zeros = () => Object.fromEntries(treatyNations.map((nation) => [nation, { ...zero }]));
-const emptyRecord = { record: [], earlierBreaks: 0 };
-const withRecord = (map, records = {}) => Object.fromEntries(Object.entries(map).map(([nation, value]) => [nation, { ...value, ...(records[nation] ?? emptyRecord) }]));
+const emptyRecord = { record: [], earlierBreaks: 0, legitimacy: 0 };
+const withRecord = (map, records = {}) => Object.fromEntries(Object.entries(map).map(([nation, value]) => [nation, { ...value, ...emptyRecord, ...(records[nation] ?? {}) }]));
 const napBreak = (epochSeconds, brokenAt, other) => ({ other, kind: 'non-aggression', brokenAt, brokenGameDay: Math.floor(Math.max(0, brokenAt - epochSeconds) * 12 / 86400) + 1, penalty: -10 });
 
 const treaty = (over = {}) => ({ kind: 'non-aggression', status: 'broken', brokenBy: 'aurelle', ...over });
@@ -55,7 +55,7 @@ for (const backend of ['sqlite', 'postgres']) {
       const bobCitizen = await r.call('citizen', 'bob');
       assert.equal(bobCitizen.status, 200);
       assert.equal(bobCitizen.cache, 'private, no-store');
-      const expectedAurelle = (clock) => withRecord({ ...zeros(), aurelle: { score: -10, brokenPacts: 1 } }, { aurelle: { record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 } });
+      const expectedAurelle = (clock) => withRecord({ ...zeros(), aurelle: { score: -10, brokenPacts: 1 } }, { aurelle: { record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0, legitimacy: -5 } });
       assert.deepEqual(bobCitizen.data.simulation.reputation, expectedAurelle(bobCitizen.data.simulation.clock), 'a Kindle viewer of GET /api/citizen scores only the broken NAP against Aurelle');
 
       const bobWorld = await r.call('world', 'bob');
@@ -82,7 +82,7 @@ for (const backend of ['sqlite', 'postgres']) {
       const aliceCitizen = await r.call('citizen', 'alice');
       assert.equal(aliceCitizen.status, 200);
       assert.equal(aliceCitizen.cache, 'private, no-store');
-      const korundRecord = (clock) => ({ score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 });
+      const korundRecord = (clock) => ({ score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0, legitimacy: -5 });
       assert.deepEqual(aliceCitizen.data.simulation.reputation.korund, korundRecord(aliceCitizen.data.simulation.clock), 'a Korund viewer keeps Korund\'s reputation entry');
       assert.ok(!('aurelle' in aliceCitizen.data.simulation.reputation) && !('kindle' in aliceCitizen.data.simulation.reputation), 'a Korund viewer does not receive a non-Korund reputation entry');
       assert.deepEqual(Object.keys(aliceCitizen.data.simulation.reputation).sort(), ['korund'], 'a Korund viewer of GET /api/citizen has only the korund reputation key');
@@ -97,9 +97,9 @@ for (const backend of ['sqlite', 'postgres']) {
       const bobCitizen = await r.call('citizen', 'bob');
       const clock = bobCitizen.data.simulation.clock;
       assert.deepEqual(bobCitizen.data.simulation.reputation, {
-        aurelle: { score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 },
+        aurelle: { score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0, legitimacy: -5 },
         kindle: { ...zero, ...emptyRecord },
-        korund: { score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 },
+        korund: { score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0, legitimacy: -5 },
       }, 'a Kindle viewer still receives every nation\'s reputation');
     } finally {
       await r.close();
@@ -152,7 +152,7 @@ test('#1474 Foreign affairs panel shows the viewer line and the zero-state copy'
     assert.match(html({ score: -20, brokenPacts: 2 }, 'aurelle'), /World Reputation: −20 \(2 broken pacts\)/);
     assert.match(html({ score: 0, brokenPacts: 0 }, 'kindle'), /No broken treaties on record/);
     assert.doesNotMatch(html({ score: 0, brokenPacts: 0 }, 'kindle'), /World Reputation:/);
-    assert.doesNotMatch(html(undefined, 'kindle'), /World Reputation:|No broken treaties on record/, 'no reputation prop: the line is omitted, matching flag-off and older callers');
+    assert.doesNotMatch(html(undefined, 'kindle'), /World Reputation:|No broken treaties on record|Legitimacy:|No legitimacy losses on record/, 'no reputation prop: the line is omitted, matching flag-off and older callers');
   } finally {
     await rt.close();
   }
