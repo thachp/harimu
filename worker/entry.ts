@@ -44,6 +44,7 @@ const worker = {
     if (on.cabinet) ctx.waitUntil((async () => runCabinetCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
       .then(() => undefined, error => { console.warn('[cron] AI Cabinet responses failed', error instanceof Error ? error.name : 'unknown'); }));
     // #400: scheduled AI-leader treaty proposals; a no-op unless HARIMU_DIPLOMACY_ENABLED is "true" (default "false").
+    // #1505: that call also proposes or lifts an AI treaty embargo when HARIMU_AI_TREATY_EMBARGO_ENABLED, diplomacy and embargo are on.
     if (on.diplomacy) ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }))()
       .then(() => undefined, error => { console.warn('[cron] AI treaty proposals failed', error instanceof Error ? error.name : 'unknown'); }));
     // #362: the AI Monarch's yearly Crown debasement decree; a no-op unless HARIMU_CROWN_DEBASEMENT_ENABLED="true". Never runs on a read.

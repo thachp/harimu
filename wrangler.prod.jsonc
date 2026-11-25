@@ -256,7 +256,9 @@
       // #1475: an Aurelle citizen may found one broadsheet and publish bylined articles in the Court Gazette (docs §18.2, §18.4). Off: the action is refused, GET /api/news is unchanged, and kindle_articles is not queried. GRAY 96 (index 95), after Korund State Media writers.
       "HARIMU_AURELLE_BROADSHEETS_ENABLED": "false",
       // #1490: trade agreements that expire by term can be re-ratified for a fresh, gapless term (docs §13.2). Off: expiry is unchanged and nothing is renewed. GRAY 97 (index 96), after Aurelle broadsheets. Only acts when HARIMU_DIPLOMACY_ENABLED is on too.
-      "HARIMU_TRADE_RENEWAL_ENABLED": "false"
+      "HARIMU_TRADE_RENEWAL_ENABLED": "false",
+      // #1505: an AI leader embargoes a nation that broke a treaty with it, and lifts that embargo when the break ages out or a new treaty is in force. Off: no proposal and no lift. Also needs HARIMU_DIPLOMACY_ENABLED and HARIMU_EMBARGO_ENABLED. Reserved as GRAY 101; today it is the next dense entry after trade renewal.
+      "HARIMU_AI_TREATY_EMBARGO_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",

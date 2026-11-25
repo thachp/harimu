@@ -182,6 +182,7 @@ const previewOnFlags = [
   'HARIMU_AURELLE_RANKS_ENABLED', // #1359 packed in HARIMU_GRAY_PACK, after newspapers (index 93, GRAY 94)
   'HARIMU_AURELLE_BROADSHEETS_ENABLED', // #1475 packed in HARIMU_GRAY_PACK, after Korund writers (index 95, GRAY 96)
   'HARIMU_TRADE_RENEWAL_ENABLED', // #1490 packed in HARIMU_GRAY_PACK, after broadsheets (index 96, GRAY 97)
+  'HARIMU_AI_TREATY_EMBARGO_ENABLED', // #1505 packed in HARIMU_GRAY_PACK, after trade renewal (index 97 today; reserved as GRAY 101)
   'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED', // #1134 packed in HARIMU_GRAY_PACK
   'HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED', // #1469 packed in HARIMU_GRAY_PACK (index 94, GRAY 95)
   'HARIMU_DIPLOMACY_ENABLED',
