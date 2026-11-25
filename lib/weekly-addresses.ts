@@ -14,7 +14,7 @@ const scripts={
  aurelle:[['The Crown and the chartered economy','Hear ye, citizens of Aurelle, by leave of the Crown, from Highspire. Ours is an hereditary monarchy, ordered by royal charter and fief, kept in the Crown as its coin and blessed by the Kinward Rite as the church of the realm. Every thread in its place. Let it be understood that this authored court address is no new decree. It alters no charter, no balance and no succession.'],['Service and the royal council','Hear ye, citizens of Aurelle. The royal council serves as an institution of the monarchy. Be it known that the offices of government in this preview are held by simulated leaders, and that every human player remains a citizen of the realm. This address announces no petition outcome and no royal appropriation. Decrees and the records of the treasury are to be read in their own proper rolls, and not here.']],
 } as const;
 export type Address={id:string;week:number;scheduledAt:number;publishedAt:number;leaderName:string;office:string;title:string;transcript:string;provenance:'authored-poc';agree:number;disagree:number;ownReaction:'agree'|'disagree'|null};
-export type AddressArchive={nationId:string;currentWeek:number;nextAddressAt:number;addresses:Address[];nextBeforeWeek:number|null};
+export type AddressArchive={nationId:string;currentWeek:number;nextAddressAt:number;addresses:Address[];nextBeforeWeek:number|null;reportsEnabled?:boolean};
 export async function publishDueAddress(db:GameDatabase,userId:string,nationId:string,now:number,options:{korundPresidium?:boolean}={}){
  if(!Object.hasOwn(scripts,nationId))return null;
  const clock=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();

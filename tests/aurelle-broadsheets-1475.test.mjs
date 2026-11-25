@@ -182,6 +182,7 @@ test('#1475 Aurelle writer uses broadsheet wording and the Kindle writer stays a
     : name === 'react' ? react
     : name === './weekly-addresses' ? { WeeklyAddresses() { return null; } }
     : name === './ai-disclosure' ? { AiTextTag() { return null; } }
+    : name === './report-button' ? { ReportButton() { return null; } }
     : require(name);
   new Function('exports', 'require', 'fetch', 'document', source)(exports, local, fetch, { body: {} });
   const all = node => [node, ...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child => typeof child === 'object' ? all(child) : [child])];
