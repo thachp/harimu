@@ -161,6 +161,26 @@ for (const backend of ['sqlite', 'postgres']) {
     }
   });
 
+  test(`#1506 same-timestamp ties: two decrees with the same decreed_at <= scheduled_at pick game_year DESC, then id DESC (${backend})`, async () => {
+    const r = await localRuntime({ backend });
+    try {
+      setFlags(r);
+      const { world } = await advanceOneTick(r, async ({ epoch, tickAt }) => {
+        const at = epoch + 1;
+        assert.ok(at <= tickAt);
+        // Later game_year has the smaller id, so id-first or ASC year would pick the other row.
+        await insertDecree(r, { id: 'd-z', year: 1, at, confidenceAfter: 80 });
+        await insertDecree(r, { id: 'd-a', year: 2, at, confidenceAfter: 70 });
+      });
+      const row = await nationRow(r, 'aurelle');
+      assert.equal(row.inputs.crownConfidence, 70, 'same decreed_at: game_year descending wins over a larger id');
+      assert.deepEqual(row.breakdown.stability.find((item) => item.input === 'currency'), { input: 'currency', points: -4, detail: 'Crown Currency Confidence 70/100' });
+      assert.equal(aurelleScore(world).stability, row.stability);
+    } finally {
+      await r.close();
+    }
+  });
+
   test(`#1506 flag off: byte-identical Stability JSON against the flag-off baseline and crown_decrees is not read (${backend})`, async () => {
     const baseline = await localRuntime({ backend });
     const off = await localRuntime({ backend });
@@ -254,7 +274,7 @@ test('#1506 readCrownConfidenceAt returns null on a missing-relation error (incl
   }
 });
 
-test('#1506 mutants of the curve, as-of read, Aurelle-only attach, and flag gate are caught in a scratch tree', () => {
+test('#1506 mutants of the curve, as-of read, tiebreak, Aurelle-only attach, and flag gate are caught in a scratch tree', () => {
   const file = 'tests/confidence-stability-1506.test.mjs';
   const cases = [
     {
@@ -274,6 +294,12 @@ test('#1506 mutants of the curve, as-of read, Aurelle-only attach, and flag gate
       find: 'SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1',
       replace: 'SELECT confidence_after FROM crown_decrees ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1',
       pattern: '#1506 a decree after scheduled_at is ignored',
+    },
+    {
+      file: 'lib/crown-debasement.ts',
+      find: 'SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1',
+      replace: 'SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, id DESC, game_year DESC LIMIT 1',
+      pattern: '#1506 same-timestamp ties',
     },
     {
       file: 'lib/stability.ts',

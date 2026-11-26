@@ -56,11 +56,7 @@ export async function readCrownMint(db: GameDatabase, now: number): Promise<Crow
     rumoredFullWeightPremiumBp: rumoredPremiumBp(parity, now), lastDecree: row ? publicDecree(row) : null };
 }
 
-export type DecreeCommand = { requestId: string; percentBp: number; decreedBy?: string };
-const sqlText = (value: string) => `'${value.replace(/'/g, "''")}'`;
-/** Server-side only. The Monarch's debasement decree: parity rises by `percentBp` (1-1500, the docs' 15% cap), Currency Confidence falls by a fixed amount and one
- *  Court Gazette line is posted, in one batch. A second decree inside the same game year is refused (409); a repeated request id replays the first receipt. */
-/** #1506: the stored confidence_after as of `at` (latest decree with decreed_at ≤ at). Baseline 100 when no such decree exists. Returns null when crown_decrees is missing, so the Stability step can omit the term. */
+/** #1506: the stored confidence_after as of `at` (latest decree with decreed_at ≤ at). Baseline 100 when no such decree exists. Returns null when crown_decrees is missing, so the Stability step can omit the term. Same-timestamp ties are broken by game_year descending, then id descending. */
 export async function readCrownConfidenceAt(db: GameDatabase, at: number): Promise<number | null> {
   try {
     const row = await db.prepare('SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1').bind(at).first<{ confidence_after: number }>();
@@ -73,6 +69,10 @@ export async function readCrownConfidenceAt(db: GameDatabase, at: number): Promi
   }
 }
 
+export type DecreeCommand = { requestId: string; percentBp: number; decreedBy?: string };
+const sqlText = (value: string) => `'${value.replace(/'/g, "''")}'`;
+/** Server-side only. The Monarch's debasement decree: parity rises by `percentBp` (1-1500, the docs' 15% cap), Currency Confidence falls by a fixed amount and one
+ *  Court Gazette line is posted, in one batch. A second decree inside the same game year is refused (409); a repeated request id replays the first receipt. */
 export async function decreeDebasement(db: GameDatabase, command: DecreeCommand, now: number, options: { enabled: boolean; emissionCaps?: boolean }) {
   if (!options.enabled) return fail(403, 'disabled', 'Crown debasement is not open yet.');
   if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
