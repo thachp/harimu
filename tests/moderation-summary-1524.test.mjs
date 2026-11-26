@@ -67,7 +67,7 @@ const noLeak = data => {
   for (const value of Object.values(LEAK)) assert.equal(text.includes(value), false, 'the response contains no reporter id, target id, note, snapshot or output text');
 };
 
-test('#1524 mutations: dropping a half-open bound, the 92-day cap, from>=to, the flag gate, bearer, per-section null or a leak is caught', () => {
+test('#1524 mutations: dropping a half-open bound, the 92-day cap, from>=to, the flag gate, bearer, per-section null, a leak or a refused-path query is caught', () => {
   const cases = [
     { file: 'lib/moderation-summary.ts', find: "const inWindow = 'created_at>=? AND created_at<?';", replace: "const inWindow = 'created_at>? AND created_at<?';", pattern: 'a row at from is included' },
     { file: 'lib/moderation-summary.ts', find: "const inWindow = 'created_at>=? AND created_at<?';", replace: "const inWindow = 'created_at>=? AND created_at<=?';", pattern: 'a row at to is excluded' },
@@ -83,6 +83,7 @@ test('#1524 mutations: dropping a half-open bound, the 92-day cap, from>=to, the
     { file: 'lib/moderation-summary.ts', find: 'if (isMissingRelation(error)) return null;', replace: 'if (isMissingRelation(error)) return { total: 0, byTargetKind: {}, byReasonId: {}, byReason: {}, byFilterResult: {}, byState: {} };', pattern: 'a missing table is null, not zeros' },
     { file: 'lib/moderation-summary.ts', find: 'SELECT ${column} AS k,COUNT(*) AS n FROM ${table}', replace: "SELECT ${table === 'moderation_reports' && column === 'target_kind' ? 'reporter_id' : column} AS k,COUNT(*) AS n FROM ${table}", pattern: 'the response contains no reporter id, target id, note, snapshot or output text' },
     { file: 'lib/moderation-summary.ts', find: 'SELECT ${column} AS k,COUNT(*) AS n FROM ${table}', replace: "SELECT ${table === 'ai_review_queue' && column === 'reason' ? 'output_text' : column} AS k,COUNT(*) AS n FROM ${table}", pattern: 'the response contains no reporter id, target id, note, snapshot or output text' },
+    { file: 'app/api/admin/moderation-summary/route.ts', find: "if (bindings.HARIMU_REPORTS_ENABLED !== 'true' || typeof bindings.HARIMU_ADMIN_TOKEN !== 'string' || bindings.HARIMU_ADMIN_TOKEN.length < 16) return privateJson({ error: 'Not found.' }, 404);", replace: "const eager = parseModerationSummaryWindow(new URL(request.url).searchParams.get('from'), new URL(request.url).searchParams.get('to')); if (eager.ok) await readModerationSummary(await getDatabase(), { from: eager.from, to: eager.to, env: bindings }); if (bindings.HARIMU_REPORTS_ENABLED !== 'true' || typeof bindings.HARIMU_ADMIN_TOKEN !== 'string' || bindings.HARIMU_ADMIN_TOKEN.length < 16) return privateJson({ error: 'Not found.' }, 404);", pattern: 'a refused path makes no database access' },
   ];
   process.env.HARIMU_MUTANT_BACKENDS = 'sqlite';
   const tree = mutantTree();
@@ -151,25 +152,31 @@ for (const backend of backends) {
     }
   }));
 
-  test(`#1524 (${backend}): the reports flag off is 404, a short token is 404, a wrong bearer is 401, a malformed date is 400, from equals to is 400, from after to is 400, a window over 92 days is 400, and a 92-day window is allowed`, quiet(async t => {
+  test(`#1524 (${backend}): the reports flag off is 404, a short token is 404, a wrong bearer is 401, a malformed date is 400, from equals to is 400, from after to is 400, a window over 92 days is 400, and a 92-day window is allowed, and a refused path makes no database access`, quiet(async t => {
     const { r, send } = await setup(t, backend);
+    const prepare = r.db.prepare.bind(r.db); let touched = 0; r.db.prepare = (...a) => { touched++; return prepare(...a); }; t.after(() => { r.db.prepare = prepare; });
+    const refused = async (query, auth, status, message) => {
+      const before = touched;
+      assert.equal((await send(query, auth)).status, status, message);
+      assert.equal(touched, before, 'a refused path makes no database access');
+    };
     r.setFixtureEnv('HARIMU_REPORTS_ENABLED', 'false');
-    assert.equal((await send(q())).status, 404, 'the reports flag off is 404');
+    await refused(q(), `Bearer ${TOKEN}`, 404, 'the reports flag off is 404');
     r.setFixtureEnv('HARIMU_REPORTS_ENABLED', 'true');
     r.setFixtureEnv('HARIMU_ADMIN_TOKEN', 'short');
-    assert.equal((await send(q(), 'Bearer short')).status, 404, 'a short token is 404');
+    await refused(q(), 'Bearer short', 404, 'a short token is 404');
     r.setFixtureEnv('HARIMU_ADMIN_TOKEN', undefined);
-    assert.equal((await send(q())).status, 404, 'a short token is 404');
+    await refused(q(), `Bearer ${TOKEN}`, 404, 'a short token is 404');
     r.setFixtureEnv('HARIMU_ADMIN_TOKEN', TOKEN);
-    assert.equal((await send(q(), null)).status, 401, 'a wrong bearer is 401');
-    assert.equal((await send(q(), 'Bearer wrong-token-0000000000000')).status, 401, 'a wrong bearer is 401');
+    await refused(q(), null, 401, 'a wrong bearer is 401');
+    await refused(q(), 'Bearer wrong-token-0000000000000', 401, 'a wrong bearer is 401');
     for (const query of [q('foo', '2026-02-01'), q('2026-02-30', '2026-04-01'), q('2026-01-01T00:00:00Z', '2026-02-01'), '?to=2026-02-01', q('2026-01-01', '2026-01-01'), q('2026-02-01', '2026-01-01')]) {
-      const res = await send(query);
-      assert.equal(res.status, 400, query.includes('2026-01-01&to=2026-01-01') ? 'from equals to is 400' : query.includes('2026-02-01&to=2026-01-01') ? 'from after to is 400' : 'a malformed date is 400');
+      await refused(query, `Bearer ${TOKEN}`, 400, query.includes('2026-01-01&to=2026-01-01') ? 'from equals to is 400' : query.includes('2026-02-01&to=2026-01-01') ? 'from after to is 400' : 'a malformed date is 400');
     }
     const start = FROM, allowed = iso(start + 92 * 86400), over = iso(start + 93 * 86400);
+    await refused(`?from=${iso(start)}&to=${over}`, `Bearer ${TOKEN}`, 400, 'a window over 92 days is 400');
+    r.db.prepare = prepare;
     assert.equal((await send(`?from=${iso(start)}&to=${allowed}`)).status, 200, 'a 92-day window is allowed');
-    assert.equal((await send(`?from=${iso(start)}&to=${over}`)).status, 400, 'a window over 92 days is 400');
   }));
 }
 
