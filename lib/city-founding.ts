@@ -40,6 +40,7 @@ export const worldCitiesSchema = `CREATE TABLE IF NOT EXISTS world_cities (
 export type FoundingCommand = { action: FoundingAction; x: number; y: number; name: string; requestId: string };
 export type FoundingResult =
   | { ok: true; city: { id: string; nationId: string; name: string; tier: number; x: number; y: number }; claimed: number; replay?: true }
+  | { ok: true; pending: true; arrivesAt: number; status: string; site: string; replay?: true }
   | { ok: false; status: 400 | 403 | 409; reason: string; error: string };
 
 const fail = (status: 400 | 403 | 409, reason: string, error: string): FoundingResult => ({ ok: false, status, reason, error });
@@ -93,6 +94,28 @@ export function checkFoundingSite(squares: readonly Square[], x: number, y: numb
 const nationOf = (action: FoundingAction) => (Object.entries(foundingAuthorities).find(([, a]) => a.action === action)![0]) as FoundingNation;
 const box = `center_x BETWEEN ? AND ? AND center_y BETWEEN ? AND ?`;
 
+/** Guarded city INSERT + block claim. Extracted so #1537 arrival (and a later #1527 rematch) reuse the same statements. */
+export function foundingClaimStatements(db: GameDatabase, args: { id: string; nation: FoundingNation; name: string; action: FoundingAction; userId: string; requestId: string; x: number; y: number; foundedAt: number; expedition?: boolean }) {
+  const { id, nation, name, action, userId, requestId, x, y, foundedAt } = args, r = claimRadius, d = minCityDistance - 1, size = (2 * r + 1) ** 2;
+  const headcount = args.expedition ? ` AND (SELECT COUNT(*) FROM citizens WHERE nation_id=?)>=${expeditionMinCitizens}` : '';
+  return [
+    db.prepare(`INSERT INTO world_cities (id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at)
+      SELECT ?,?,?,1,?,?,?,?,?,? WHERE
+      (SELECT COUNT(*) FROM world_squares WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND zone='wildlands' AND owner IS NULL AND feature IS NULL)=?
+      AND NOT EXISTS (SELECT 1 FROM world_squares WHERE feature IN ('capital','border outpost','city') AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?)
+      AND NOT EXISTS (SELECT 1 FROM world_cities WHERE ${box})${headcount}
+      ON CONFLICT DO NOTHING`).bind(id, nation, name, x, y, action, userId, requestId, foundedAt,
+      x - r, x + r, y - r, y + r, size, x - d, x + d, y - d, y + d, x - d, x + d, y - d, y + d, ...(args.expedition ? [nation] : [])),
+    db.prepare(`UPDATE world_squares SET owner=?, zone='frontier', feature=CASE WHEN x=? AND y=? THEN 'city' ELSE feature END
+      WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND EXISTS (SELECT 1 FROM world_cities WHERE id=? AND request_id=?)`)
+      .bind(nation, x, y, x - r, x + r, y - r, y + r, id, requestId),
+  ];
+}
+
+
+
+/** #1537: maps the one-en-route refusal so land-copy can pin the reason next to the other founding codes. */
+export const expeditionEnRouteRefusal = (): FoundingResult => fail(409, 'expedition_en_route', 'An expedition from your nation is already on the way.');
 export async function foundCity(db: GameDatabase, userId: string, nationId: string | null, command: FoundingCommand, now: number, enabled: boolean, env?: unknown): Promise<FoundingResult> {
   const denied = foundingAuthority(nationId, command.action, enabled); if (denied) return denied;
   const nation = nationOf(command.action);
@@ -106,25 +129,13 @@ export async function foundCity(db: GameDatabase, userId: string, nationId: stri
   const squares = onGrid(results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) })); // #486: rows beyond the grid are ignored
   if (squares.length !== mapWidth * mapHeight) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   const site = checkFoundingSite(squares, command.x, command.y); if (site) return site;
-  const { x, y } = command, r = claimRadius, d = minCityDistance - 1, size = (2 * r + 1) ** 2;
+  const { x, y } = command, size = (2 * claimRadius + 1) ** 2;
   const id = `city-${nation}-${x}-${y}`;
   const expedition = cityExpeditionEnabled(env);
   // Guarded writes in one batch (one transaction on D1 and Postgres): the city row is inserted only if the
   // whole block is still unowned Wildlands and no settlement is within range; squares change only if that row exists.
   // Flag on: the same INSERT also requires the expedition headcount. Flag off: this statement is unchanged.
-  const headcount = expedition ? ` AND (SELECT COUNT(*) FROM citizens WHERE nation_id=?)>=${expeditionMinCitizens}` : '';
-  await db.batch([
-    db.prepare(`INSERT INTO world_cities (id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at)
-      SELECT ?,?,?,1,?,?,?,?,?,? WHERE
-      (SELECT COUNT(*) FROM world_squares WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND zone='wildlands' AND owner IS NULL AND feature IS NULL)=?
-      AND NOT EXISTS (SELECT 1 FROM world_squares WHERE feature IN ('capital','border outpost','city') AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?)
-      AND NOT EXISTS (SELECT 1 FROM world_cities WHERE ${box})${headcount}
-      ON CONFLICT DO NOTHING`).bind(id, nation, command.name, x, y, command.action, userId, command.requestId, now,
-      x - r, x + r, y - r, y + r, size, x - d, x + d, y - d, y + d, x - d, x + d, y - d, y + d, ...(expedition ? [nation] : [])),
-    db.prepare(`UPDATE world_squares SET owner=?, zone='frontier', feature=CASE WHEN x=? AND y=? THEN 'city' ELSE feature END
-      WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND EXISTS (SELECT 1 FROM world_cities WHERE id=? AND request_id=?)`)
-      .bind(nation, x, y, x - r, x + r, y - r, y + r, id, command.requestId),
-  ]);
+  await db.batch(foundingClaimStatements(db, { id, nation, name: command.name, action: command.action, userId, requestId: command.requestId, x, y, foundedAt: now, expedition }));
   const created = await db.prepare('SELECT id FROM world_cities WHERE request_id=?').bind(command.requestId).first<{ id: string }>();
   if (!created) {
     if (expedition) {
