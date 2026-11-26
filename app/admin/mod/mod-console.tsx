@@ -103,8 +103,8 @@ export function ModConsole({
     </div>}
     {result?.ok && result.panel === 'reports' && result.reports.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="reports">
       <table className={styles.table}><caption>reports</caption>
-        <thead><tr>{['created_at', 'reason_id', 'target_kind', 'target_id', 'reporter_id', 'request_id', 'note', 'id'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
-        <tbody>{result.reports.map(r => <tr key={r.id}><td>{utc(r.created_at)}</td><td>{r.reason_id}</td><td>{r.target_kind}</td><td>{r.target_id}</td><td>{r.reporter_id}</td><td>{r.request_id}</td><td>{r.note ?? ''}</td><td>{r.id}</td></tr>)}</tbody>
+        <thead><tr>{['created_at', 'reason_id', 'target_kind', 'target_id', 'target_snapshot', 'reporter_id', 'request_id', 'note', 'id'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
+        <tbody>{result.reports.map(r => <tr key={r.id}><td>{utc(r.created_at)}</td><td>{r.reason_id}</td><td>{r.target_kind}</td><td>{r.target_id}</td><td>{r.target_snapshot ?? ''}</td><td>{r.reporter_id}</td><td>{r.request_id}</td><td>{r.note ?? ''}</td><td>{r.id}</td></tr>)}</tbody>
       </table>
     </div>}
     {result?.ok && result.panel === 'ai-decisions' && result.decisions.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="ai-decisions">

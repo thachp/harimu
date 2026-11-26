@@ -1,4 +1,4 @@
-/** Out-of-character Report copy for citizen chat, AI leader addresses, AI-written news and Notable replies (issue #457, docs §21.3). Content
+/** Out-of-character Report copy for citizen chat, AI leader addresses, AI-written news, Notable replies (issue #457) and square posters (#1503, docs §21.3). Content
  * for the report button, its dialog and the intake route (#743); the moderation queue belongs to another lane.
  * Canon: harimu-docs moderation-safety §21.3 (a report button on every message, name, poster, profile "and every AI-generated speech, article
  * or Notable reply"), §21.1 (moderation reports are "a separate, clearly labeled OOC tool; in-game 'denunciation' is a different button"; the
@@ -19,12 +19,12 @@ export const REPORT_LABEL_MAX=40;
 export const REPORT_LINE_MAX=80;
 
 export type Line={text:string;proposal:true};
-export type ReportTargetId='citizen-message'|'ai-leader-address'|'ai-news'|'notable-reply';
+export type ReportTargetId='citizen-message'|'ai-leader-address'|'ai-news'|'notable-reply'|'square-poster';
 export type ReportReasonId='real-world-politics'|'hate-harassment'|'threats-danger'|'sexual-content'|'ai-inappropriate'|'spam-other';
 export type ReportTarget={id:ReportTargetId;entryLabel:string;accessibleName:string;aiTarget:boolean;proposal:true};
 export type ReportReason={id:ReportReasonId;label:string;aiOnly:boolean;proposal:true};
 
-export const REPORT_TARGET_IDS:readonly ReportTargetId[]=['citizen-message','ai-leader-address','ai-news','notable-reply'];
+export const REPORT_TARGET_IDS:readonly ReportTargetId[]=['citizen-message','ai-leader-address','ai-news','notable-reply','square-poster'];
 export const REPORT_REASON_IDS:readonly ReportReasonId[]=['real-world-politics','hate-harassment','threats-danger','sexual-content','ai-inappropriate','spam-other'];
 
 const L=(text:string):Line=>({text,proposal:true});
@@ -37,6 +37,7 @@ export const reportTargets:readonly ReportTarget[]=[
  t('ai-leader-address','Report this address','Report this AI leader address to Harimu moderators',true),
  t('ai-news','Report this article','Report this AI-written news line to Harimu moderators',true),
  t('notable-reply','Report this reply','Report this Notable reply to Harimu moderators',true),
+ t('square-poster','Report this poster','Report this square poster to Harimu moderators',false),
 ];
 export function reportTargetFor(id:ReportTargetId){return reportTargets.find(x=>x.id===id);}
 

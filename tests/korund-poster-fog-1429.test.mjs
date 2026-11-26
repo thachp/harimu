@@ -57,6 +57,7 @@ for (const backend of ['sqlite', 'postgres']) test(`Korund poster read fog (${ba
   r.setFixtureEnv(FOG, 'false');
   const off = await spy(r, () => read(r, 'alice', far.x, far.y));
   assert.equal(off.result.status, 200);
-  assert.deepEqual(off.result.data.poster, farFull.data.poster, 'flag off: a Korund viewer receives the distant poster');
+  const posterFields = p => p && { frameId: p.frameId, sloganId: p.sloganId, text: p.text };
+  assert.deepEqual(posterFields(off.result.data.poster), posterFields(farFull.data.poster), 'flag off: a Korund viewer receives the distant poster');
   assert.equal(off.sql.some(q => /world_squares/i.test(q)), false, 'flag off: no world-squares read');
 });

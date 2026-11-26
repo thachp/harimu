@@ -83,3 +83,13 @@ test('focus moves to the first reason on open and back to the Report button on c
     assert.equal(slots[0], false); h.render(); h.effects.forEach(fn => fn()); assert.deepEqual(focused, ['reason', 'entry'], close);
   }
 });
+
+test('#1503 square-poster uses the proposal copy, hides the AI-only reason, and the inspector wires the button behind reportsEnabled', async () => {
+  assert.equal(harness('square-poster', []).render().props.children, copy.reportTargetFor('square-poster').entryLabel);
+  assert.equal(harness('square-poster', []).render().props['aria-label'], copy.reportTargetFor('square-poster').accessibleName);
+  const h = harness('square-poster', [true]);
+  assert.equal(h.all(h.render()).some(n => n?.props?.value === 'ai-inappropriate'), false);
+  const zones = await readFile(new URL('../app/world-zones.tsx', import.meta.url), 'utf8');
+  assert.match(zones, /reportsEnabled === true && listing\.poster && listing\.poster\.mine !== true/);
+  assert.match(zones, /<ReportButton kind="square-poster" targetId=\{`\$\{selected\.x\},\$\{selected\.y\}`\} \/>/);
+});
