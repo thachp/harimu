@@ -13,7 +13,7 @@ const restore = () => { for (const name of names) { if (saved[name] === undefine
 const on = () => { for (const name of names) process.env[name] = 'true'; };
 describe('place nav nits 1445', { concurrency: false }, () => {
   test('the door faces the square, crumbs carry district and city, and the nits stay behind the existing classes', async () => {
-    assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 76);
+    assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 77);
     assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(75), PLACE_NAV_FLAG);
     const north = houseDoorPose({ x: 0, z: -8 }), south = houseDoorPose({ x: 0, z: 8 }), east = houseDoorPose({ x: 8, z: 0 }), west = houseDoorPose({ x: -8, z: 0 });
     assert.deepEqual(north, { x: 0, y: 0.46, z: -8 + 0.78, rotationY: 0 });
