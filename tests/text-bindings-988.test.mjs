@@ -47,6 +47,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED'), 100); // #1506 follows reputation debasement at index 100. indexOf only, no length pin.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TREATY_BREAK_ENABLED'), 101); // #1507 is GRAY 102 at index 101, after Crown Confidence to Stability. indexOf only, no at(-1).
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED'), 102); // #1515 follows treaty-break at index 102. indexOf only, no length pin.
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 103);
 
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-1), 'HARIMU_WAR_EVACUATION_ENABLED'); // #1324 entry 10, after national service. Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-2), 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED'); // #1095 stays entry 9
@@ -547,6 +548,8 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED'), 102);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED, 'false');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length, 103);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length, 103);
 
   assert.equal(preview.vars.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, undefined, 'Varkand red-alert cancels is not its own binding');
   assert.equal(prod.vars.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, undefined);
