@@ -35,6 +35,7 @@ const flagOffPins = {
   HARIMU_NAP_REPUTATION_GATE_ENABLED: 'nap-reputation-gate-1495.test.mjs', // #1495 flag off: ratification matches current dev (no low-reputation refusal)
   HARIMU_BATTLE_TERRAIN_ENABLED: 'battle-terrain-1491.test.mjs', // #1491 flag off: readBattles, the battles API, and the card line add no terrain keys
   HARIMU_REPUTATION_DEBASEMENT_ENABLED: 'reputation-debasement-1496.test.mjs', // #1496 flag off: Reputation is unchanged and crown_decrees is not read
+  HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED: 'confidence-stability-1506.test.mjs', // #1506 flag off: Stability JSON is unchanged and crown_decrees is not read
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
