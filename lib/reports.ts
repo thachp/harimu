@@ -1,5 +1,6 @@
-/** #743 slice 1, #1462 slice 2 and #1503 slice 3: out-of-character Report intake (docs moderation-safety §21.3, §21.1). Write-only from the
- *  player side: no API returns report rows to players. Table from migrations 0070, 0133 and 0135. Flag HARIMU_REPORTS_ENABLED. */
+/** #743 slice 1, #1462 slice 2, #1503 slice 3 and #1523: out-of-character Report intake (docs moderation-safety §21.3, §21.1). Write-only from the
+ *  player side: no API returns report rows to players. Table from migrations 0070, 0133 and 0135. Flag HARIMU_REPORTS_ENABLED.
+ *  A citizen-message may be a live square, city, global, DM or embassy message, or — when HARIMU_PARTY_CHAT_ENABLED or HARIMU_CONGREGATION_CHAT_ENABLED is on — a live party or congregation message in the reporter's current membership, not their own. */
 import {env} from 'cloudflare:workers';
 import type {GameDatabase} from './database-contract';
 import {reasonsFor,reportReasons,type ReportReasonId} from './report-copy';
@@ -11,6 +12,8 @@ import {aiTemplatesOnly} from './ai-kill-switch';
 import {KINDLE_NEWSPAPERS_FLAG,readPlayerArticles} from './kindle-newspapers';
 import {flagOn} from './flag-pack.mjs';
 import {parsePosterTargetId,readVisiblePoster} from './square-posters';
+import {partyChatFlagOn} from './party-chat';
+import {congregationChatFlagOn} from './congregation-chat';
 
 export const reportDailyLimit=10;
 export const reportNoteMax=280;
@@ -55,7 +58,10 @@ async function targetVisible(db:GameDatabase,userId:string,nationId:string,kind:
   // #881 part 3: or a live DM the reporter is a party to (not their own).
   ||Boolean(await db.prepare('SELECT 1 AS ok FROM dm_chat_messages WHERE id=? AND deleted=0 AND sender_id<>? AND (sender_id=? OR peer_id=?)').bind(targetId,userId,userId,userId).first())
   // #882: or a live embassy message in a channel the reporter's nation belongs to (not their own).
-  ||Boolean(await db.prepare("SELECT 1 AS ok FROM embassy_chat_messages m JOIN citizens c ON c.clerk_user_id=? AND c.nation_id IS NOT NULL WHERE m.id=? AND m.deleted=0 AND m.user_id<>? AND (m.channel_id LIKE c.nation_id || '|%' OR m.channel_id LIKE '%|' || c.nation_id)").bind(userId,targetId,userId).first());
+  ||Boolean(await db.prepare("SELECT 1 AS ok FROM embassy_chat_messages m JOIN citizens c ON c.clerk_user_id=? AND c.nation_id IS NOT NULL WHERE m.id=? AND m.deleted=0 AND m.user_id<>? AND (m.channel_id LIKE c.nation_id || '|%' OR m.channel_id LIKE '%|' || c.nation_id)").bind(userId,targetId,userId).first())
+  // #1523: or a live party / congregation message in the reporter's current membership, not their own, only while that channel flag is on.
+  ||(partyChatFlagOn(env)&&Boolean(await db.prepare('SELECT 1 AS ok FROM party_messages m JOIN party_members p ON p.clerk_user_id=? AND p.party_id=m.party_id WHERE m.id=? AND m.deleted=0 AND m.user_id<>?').bind(userId,targetId,userId).first()))
+  ||(congregationChatFlagOn(env)&&Boolean(await db.prepare('SELECT 1 AS ok FROM congregation_messages m JOIN congregation_members c ON c.user_id=? AND c.congregation_id=m.congregation_id WHERE m.id=? AND m.deleted=0 AND m.user_id<>?').bind(userId,targetId,userId).first()));
  // #1462: a published weekly address for the reporter's own nation (the same nation gate as readAddressArchive).
  if(kind==='ai-leader-address')return Boolean(await db.prepare('SELECT 1 AS ok FROM weekly_addresses a WHERE a.id=? AND a.nation_id=? AND EXISTS(SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?)').bind(targetId,nationId,userId,nationId).first());
  // An item already in the reporter's news edition that the edition marks as model-written or deterministic AI-labeled. System records and player articles are not this target.
