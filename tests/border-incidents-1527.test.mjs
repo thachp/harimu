@@ -12,6 +12,8 @@ import { FLAG_PACKS } from '../lib/flag-pack.mjs';
 const FLAG = 'HARIMU_BORDER_INCIDENTS_ENABLED', D = 86400, ON = { [FLAG]: 'true' };
 const spy = db => { const seen = []; return { seen, db: new Proxy(db, { get(t, k) { if (k === 'prepare') return sql => { seen.push(sql); return t.prepare(sql); }; const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }) }; };
 const touches = seen => seen.filter(sql => /border_incidents/.test(sql));
+/** The same database, but border_incidents does not exist (migration 0137 not applied): every statement naming it hits a real missing-relation error. */
+const noTable = db => new Proxy(db, { get: (t, k) => k === 'prepare' ? sql => t.prepare(sql.replace(/\bborder_incidents\b/g, 'border_incidents_missing_1527')) : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
 
 test('#1527 flag: GRAY 105 at index 103, preview "true", production "false"; migration 0137 is additive, identical, and matches the bootstrap', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 103); // after #1515 war-loss confidence (index 102)
@@ -92,6 +94,18 @@ for (const backend of ['sqlite', 'postgres']) {
     await write('p-1527', 2); await write('p-1527', 2); assert.equal((await c.rows()).length, 1, 'written once; the unique key absorbs a second write');
   });
 
+  test(`#1527 ${backend}: flag on with no border_incidents table (0137 not applied): purchase and founding still succeed and record nothing`, async t => {
+    const c = await setup(t); await c.tessera(5000);
+    await c.site([['korund', 20, 13], ['kindle', 22, 14]]);
+    const bought = await c.buy(ON, randomUUID(), noTable(c.r.db));
+    assert.equal(bought.ok, true, JSON.stringify(bought));
+    assert.equal((await c.r.db.prepare('SELECT owner FROM world_squares WHERE x=21 AND y=13').first()).owner, 'korund', 'the whole purchase batch committed');
+    await c.site([['kindle', 24, 12]]);
+    const founded = await c.found(ON, undefined, noTable(c.r.db));
+    assert.equal(founded.ok, true, JSON.stringify(founded)); assert.equal(founded.claimed, 25);
+    assert.deepEqual(await c.rows(), [], 'no incident written anywhere');
+  });
+
   test(`#1527 ${backend}: flag on, a city founding records one incident per nation touching the claimed block, at the centre; replay writes nothing`, async t => {
     const c = await setup(t);
     await c.site([['kindle', 24, 12], ['aurelle', 25, 13]]);
@@ -119,8 +133,7 @@ for (const backend of ['sqlite', 'postgres']) {
     r.setFixtureEnv(FLAG, 'true');
     await r.db.prepare("INSERT INTO embargoes (id,request_id,pair_key,actor_nation,target_nation,proposed_by,proposed_at,status,decided_at,imposed_at,lifted_at) VALUES ('e1','e1','kindle:korund','korund','kindle','AI Chair',?,'in_force',?,?,NULL)").bind(now - 10, now, now).run();
     const ok = await declare(); assert.equal(ok.ok, true, JSON.stringify(ok));
-    const missing = new Proxy(r.db, { get: (db, k) => k === 'prepare' ? sql => db.prepare(sql.replace(/\bborder_incidents\b/g, 'border_incidents_missing_1527')) : typeof db[k] === 'function' ? db[k].bind(db) : db[k] });
-    assert.equal((await war.readGrievanceInputs(missing, 'kindle', 'korund', now, true)).borderIncidents, 0, 'a missing table reads as 0, no throw');
+    assert.equal((await war.readGrievanceInputs(noTable(r.db), 'kindle', 'korund', now, true)).borderIncidents, 0, 'a missing table reads as 0, no throw');
   });
 
   test(`#1527 ${backend}: national news carries one plain wire line per incident for the actor and the target; off, nothing`, async t => {
@@ -135,12 +148,15 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-test('#1527 mutants: dropping a write guard, the window boundary or the grievance direction fails the SQLite tests', { timeout: 600_000 }, () => {
+test('#1527 mutants: dropping a write guard, the missing-table tolerance, the window boundary or the grievance direction fails the SQLite tests', { timeout: 600_000 }, () => {
   const cases = [
     { file: 'lib/border-incidents.ts', find: 'WHERE EXISTS (${a.action.sql}) AND EXISTS', replace: 'WHERE EXISTS' },
     { file: 'lib/border-incidents.ts', find: 'AND occurred_at>?', replace: 'AND occurred_at>=?' },
     { file: 'lib/war.ts', find: 'borderIncidentCount(db, defender, attacker, now)', replace: 'borderIncidentCount(db, attacker, defender, now)' },
     { file: 'lib/world-registry.ts', find: "borderIncidentTargets(squares, nationId, [{ x, y }])", replace: '[]' },
+    { file: 'lib/border-incidents.ts', find: 'if (isMissingRelation(error)) return false; throw error;', replace: 'throw error;' }, // ARC #1536: the missing-table tolerance
+    { file: 'lib/world-registry.ts', find: 'borderIncidentsEnabled(env) && await borderIncidentTableReady(db) ?', replace: 'borderIncidentsEnabled(env) ?' },
+    { file: 'lib/city-founding.ts', find: 'borderIncidentsEnabled(env) && await borderIncidentTableReady(db) ?', replace: 'borderIncidentsEnabled(env) ?' },
   ];
   const tree = mutantTree();
   try {

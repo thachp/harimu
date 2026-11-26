@@ -24,6 +24,12 @@ export function borderIncidentTargets(squares: readonly { x: number; y: number; 
   return [...found].sort();
 }
 
+/** ARC on #1536: a side record never blocks the core action. With the flag on and migration 0137 not applied, the purchase or founding still succeeds and records
+ *  nothing. Checked before the batch: a failing statement aborts the whole transaction on Postgres (and the D1 batch), so it cannot be tolerated inside it. */
+export async function borderIncidentTableReady(db: GameDatabase): Promise<boolean> {
+  try { await db.prepare('SELECT 1 AS ok FROM border_incidents LIMIT 1').first(); return true; } catch (error) { if (isMissingRelation(error)) return false; throw error; }
+}
+
 /** One INSERT per target, for the action's own batch. Each writes only if the action's row exists (`action`) and the target still owns a square within `radius`
  *  of (x, y), so a refused or raced action records nothing. A replayed request id hits UNIQUE(kind, request_id, target_nation) and writes nothing new. */
 export function borderIncidentStatements(db: GameDatabase, a: { kind: BorderIncidentKind; requestId: string; actor: string; x: number; y: number; at: number; radius: number; targets: readonly WarNationId[]; action: { sql: string; binds: unknown[] } }) {
