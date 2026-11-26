@@ -8,6 +8,8 @@ export function placeNavEnabled(value: string | undefined = placeNavFlag()): boo
 /** Rail and Neighborhood crumb: the walk (UI_PACK 71) and the desktop gate must be on too. Household stays inside City. */
 export function placeNavShown(value?: string): boolean { return placeNavEnabled(value) && neighborhoodWalkEnabled() && desktopGateEnabled(); }
 export const placeRailLevels = [{ id: 'world', name: 'World' }, { id: 'country', name: 'Nation' }, { id: 'square', name: 'City' }, { id: 'neighborhood', name: 'Neighborhood' }] as const;
+/** Bottom-dock title. Neighborhood names the level. Other views keep the caller's label, so Household stays the household fallback only. */
+export function levelDockTitle(view: string): string | null { return view === 'neighborhood' ? 'Neighborhood' : null; }
 export function placeRailCurrent(level: string, view: string): 'page' | 'location' | undefined { const here = view === 'neighborhood' ? 'neighborhood' : view === 'world' ? 'world' : view === 'country' || view === 'nation' || view === 'military' || view === 'economy' || view === 'faith' ? 'country' : 'square'; return here !== level ? undefined : view === level ? 'page' : 'location'; }
 const zoomOrder = ['world', 'country', 'square', 'neighborhood'] as const;
 const zoomRank = (view: string) => view === 'world' ? 0 : view === 'country' || view === 'nation' || view === 'military' || view === 'economy' || view === 'faith' ? 1 : view === 'square' ? 2 : view === 'neighborhood' ? 3 : -1;

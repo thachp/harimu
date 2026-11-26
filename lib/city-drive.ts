@@ -48,3 +48,6 @@ const waits = new Set<(ask: Ask) => void>();
 export function driveHere(index: number): boolean { if (!waits.size) return false; for (const fn of waits) fn({ index }); return true; }
 export function onDriveHere(fn: (ask: Ask) => void): () => void { waits.add(fn); return () => { waits.delete(fn); }; }
 export function enterDistrict(index: number, onView: (view: 'neighborhood') => void) { rememberDistrict(index); onView('neighborhood'); }
+/** The square place opens the existing square scene. The drive listens and steps aside. */
+export const citySquareEvent = 'harimu-square-open';
+export function openCitySquare(): void { try { if (typeof window !== 'undefined') window.dispatchEvent(new Event(citySquareEvent)); } catch { /* no window */ } }

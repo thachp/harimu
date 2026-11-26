@@ -24,3 +24,7 @@
 .bleed .map .routes{stroke:#f1d58a}
 .capitalMarker{position:absolute;left:50%;top:0;width:8px;height:8px;margin-left:-4px;background:#f1d58a;transform:translateY(-12px) rotate(45deg);box-shadow:0 0 0 1px #071820}
 .bleed button:focus-visible{outline:2px solid #f3ecd6;outline-offset:2px}
+/* #1445 slice 4c. At 150% text the pins stay inside the nation map and clear of the lore footnote. Flag off: no .game-place-nav, and --pin-edge stays 0 so the old top percentage is unchanged. */
+:global(.harimu-game.game-place-nav) .bleed .map{--pin-edge:calc(56px * var(--text-scale, 1));min-height:calc(320px * var(--text-scale, 1))}
+:global(.harimu-game.game-place-nav) .bleed .pin{max-width:min(var(--pin-max), 34%)}
+:global(.harimu-game.game-place-nav) .country>small{display:block;margin:10px 12px 12px;max-width:100%;overflow-wrap:normal;word-break:normal;hyphens:manual}

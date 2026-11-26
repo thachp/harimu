@@ -60,7 +60,7 @@ const probe = scene => {
   if (scene.visitor && (/Citizen snapshot/.test(strip) || /CITIZEN VIEW/.test(note))) issues.push(`a visitor sees citizen wording in the context strip ("${strip}") or footer note ("${note}")`);
   if (!scene.visitor && (strip !== 'Citizen snapshot' || note !== 'CITY DISTRICTS · CITIZEN VIEW')) issues.push(`a citizen's strip/note changed ("${strip}" / "${note}")`);
   if (scene.guide && !page.includes(scene.guide)) issues.push(`guide heading "${scene.guide}" missing`);
-  if (scene.pins && ![...document.querySelectorAll('button small')].some(e => text(e) === scene.pins)) issues.push(`country pins lack "${scene.pins}"`);
+  if (scene.pins) { const notes = [...document.querySelectorAll('small')].filter(e => text(e) === scene.pins), onPins = [...document.querySelectorAll('[aria-label="Illustrative country map"] button small')].filter(e => text(e) === scene.pins); if (notes.length !== 1 || onPins.length) issues.push(`presence note should appear once, off the pins (found ${notes.length}, on pins ${onPins.length})`); }
   // Text must stay inside its own box: guide card, inspector header, country pins.
   const boxes = [...document.querySelectorAll('section[aria-labelledby="first-visit-title"], .game-inspector-title, [aria-label="Illustrative country map"] button small')];
   for (const box of boxes) {

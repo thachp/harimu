@@ -33,6 +33,7 @@ import { emptyResidents, neighborhoodWalkEnabled } from '@/lib/neighborhood-walk
 import { neighborhoodTalkEnabled } from '@/lib/neighborhood-talk';
 import { desktopGateEnabled } from '@/lib/desktop-gate';
 import { cityDriveEnabled, driveEntry } from '@/lib/city-drive';
+import { levelDockTitle } from '@/lib/place-nav';
 import { NeighborhoodWalk } from './neighborhood-walk';
 import { CityDrive } from './city-drive';
 import { previewOpenNations } from '@/lib/nation-discovery';
@@ -1917,7 +1918,7 @@ export default function Home() {
     {clerkConfigured && citizenNation?.id === 'kindle' && <IVotedBadge />}
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
-    {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
+    {(!clerkConfigured || !citizenNationId) && <div id="city-noticeboard"><SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" /></div>}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationPanel onNationMap={() => changeView('country')} treasuryPublished={budgetFlag} treasuryMinor={kindleBudget?.treasuryMinor ?? null} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
@@ -2004,7 +2005,7 @@ export default function Home() {
   const closeMorningBrief = () => { setMorningBriefOpen(false); if (briefStorageKey) try { window.localStorage.setItem(briefStorageKey, briefDayKey(Date.now())); } catch {} };
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
-      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'military' ? 'Military' : viewMode === 'economy' ? 'Economy' : viewMode === 'faith' ? 'Faith' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : 'Household';
+      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'military' ? 'Military' : viewMode === 'economy' ? 'Economy' : viewMode === 'faith' ? 'Faith' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : levelDockTitle(viewMode) ?? 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} onWelcomeBack={setWelcomeBack} />}
     <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} wcNote={currentCityAccount?.spaWcNote} countdown={guestActive || !citizenNation ? undefined : { nationId: citizenNation.id, cycleStartAt, election, wars: simulation?.wars ?? null }} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldAges={worldAges} faithFestivalHud={faithFestivalHud} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || viewMode === 'military' || viewMode === 'economy' || viewMode === 'faith' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}

@@ -60,7 +60,8 @@ test('#379: first-visit guide and country map wording do not call a visitor a ci
   assert.deepEqual([...liveNations],['kindle','korund','aurelle'],'the guide names the three playable nations; update it if this list changes');
   assert.match(guide,/Three of them \(Kindle, Korund and Aurelle\) are playable/);
   const country=await readFile(new URL('../app/country-scene.tsx',import.meta.url),'utf8');
-  assert.match(country,/preview \? 'Presence shows in your own nation' : 'Online count unavailable'/,'citizens keep "Online count unavailable"');
+  assert.match(country,/preview \? null : 'Online count unavailable'/,'citizens keep "Online count unavailable"');
+  assert.equal(country.split('Presence shows in your own nation').length - 1, 1, 'the visitor presence line is one note, not one per pin');
 });
 
 test('#379: a citizen reloading a city URL while the session loads never sees visitor wording (and the scene is not rebuilt after load)',async()=>{
