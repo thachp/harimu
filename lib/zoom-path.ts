@@ -3,7 +3,7 @@
  *  Layout bundles that omit the define have no `process`. A missing flag is off. Only the exact string "true" enables it.
  *  Labels are the nation's and city's existing names. The hrefs are the same scene query the page already reads. */
 import { sceneUrl } from './scene-navigation.ts';
-export { placeNavShown, placeRailCurrent, placeRailLevels } from './place-nav.ts';
+export { placeCrumbTargets, placeNavShown, placeRailCurrent, placeRailLevels } from './place-nav.ts';
 
 export const ZOOM_PATH_FLAG = 'NEXT_PUBLIC_HARIMU_ZOOM_PATH';
 export function zoomPathFlag(): string | undefined {
