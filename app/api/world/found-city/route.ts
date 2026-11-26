@@ -4,6 +4,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
+import { cityExpeditionTravelEnabled, departCityExpedition } from '@/lib/city-expedition-travel'; // #1537
 import { cityImportsFields, citySpecialtyFields, cityCaptureNote, cityCivicUnitNote, cityGovernorFields } from '@/lib/cities'; // #996 / #1001 / #1002 / #1006 / #1007
 import { cityTierName, cityTierUnlockFields, cityTierFestivalNote, cityTierPopulationNote } from '@/lib/city-tier'; // #952 / #979 / #984 / #1014
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988 / #1003
@@ -29,8 +30,12 @@ export async function POST(request: Request) {
   if (!command) return privateJson({ error: 'Send action, integer x/y, a 2–40 letter city name and a requestId.', reason: 'bad_request' }, 400);
   const db = await getDatabase();
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string }>();
-  const result = await foundCity(db, userId, citizen?.nation_id ?? null, command, Math.floor(Date.now() / 1000), enabled, env);
+  const now = Math.floor(Date.now() / 1000);
+  const result = cityExpeditionTravelEnabled(env)
+    ? await departCityExpedition(db, userId, citizen?.nation_id ?? null, command, now, enabled, env)
+    : await foundCity(db, userId, citizen?.nation_id ?? null, command, now, enabled, env);
   if (!result.ok) return privateJson({ error: result.error, reason: result.reason }, result.status);
+  if (!('city' in result)) return privateJson(result, 202);
   // #952: flag off keeps the founding body (tier 1, no tier name). Flag on names the stored tier.
   // #979: unlocks flag adds districtSlots + unlocks (and tierName) from the doc table; flag off leaves the body unchanged.
   // #984: festival-note flag adds festivalNote from the Cities tier table; flag off leaves the body unchanged.

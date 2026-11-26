@@ -32,6 +32,7 @@ import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
 import { worldSquaresSchema, worldSquaresSeedSql, bootNationSquaresSql, rareNodesSql } from './map-zones';
 import { worldCitiesSchema } from './city-founding';
+import { cityExpeditionsSchema, cityExpeditionsEnRouteIndex } from './city-expedition-travel'; // #1537
 import { aurelleCharterSchemas } from './aurelle-charters';
 import { tesseraRewardSchemas } from './tessera-rewards'; // #465
 import { relocationSupportSchemas } from './relocation-support'; // #470
@@ -322,6 +323,7 @@ async function initialize(database: GameDatabase) {
     ...bootNationSquaresSql().map(sql => database.prepare(sql)), // #491: nothing today; adds a new nation's squares once it has a capital
     ...rareNodesSql().map(sql => database.prepare(sql)), // #745: the seven missing rare node types (same as migration 0067)
     database.prepare(worldCitiesSchema),
+    database.prepare(cityExpeditionsSchema), database.prepare(cityExpeditionsEnRouteIndex), // #1537
     ...squareSchema.map(sql => database.prepare(sql)), ...hallSchema.map(sql => database.prepare(sql)), ...foundingSchema.map(sql => database.prepare(sql)), ...aurelleSuccessionSchemas.map(sql => database.prepare(sql)), // #599, #612, #613
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),

@@ -4,6 +4,7 @@ import { runRiskScoring } from './risk-scoring'; // #879
 import { dormantAt } from './dormancy-rules'; // #739
 import { dormantJobStatements } from './dormant-job'; // #1066
 import { runFoundingDay30 } from './founding-period'; // #612
+import { settleCityExpeditions } from './city-expedition-travel'; // #1537
 import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
 import { runPrimaries, type PrimaryScope } from './primaries';
@@ -120,6 +121,8 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
      { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true, peaceRevert: options.peaceRevert === true }).catch(warnOnly('war endings')) }],
     // #612: the Founding Period's one day-30 event per MVP nation (idempotent).
     [{ name: 'foundingDay30', on: options.foundingPeriod === true, run: () => runFoundingDay30(db, now).catch(warnOnly('founding day-30')) }],
+    // #1537: expeditions whose arrives_at is due claim (or fail) once. Missing table is a no-op. Not a new #679 chain; not in cron-advance.
+    [{ name: 'cityExpeditionTravel', on: flagOn(options.atlasEnv, 'HARIMU_CITY_EXPEDITION_TRAVEL_ENABLED') && flagOn(options.atlasEnv, 'HARIMU_CITY_FOUNDING_ENABLED'), run: () => settleCityExpeditions(db, now).catch(warnOnly('city expedition travel')) }],
     // #825 Kindle vote-buying watch: one idempotent sweep statement over direct transfers/gifts only (none exist yet, so no query) (HARIMU_VOTE_BUYING_WATCH_ENABLED; citizen POST path only, never a GET).
     [{ name: 'voteBuyingWatch', on: options.voteBuyingWatch === true, run: () => runVoteBuyingWatch(db, now).catch(warnOnly('vote-buying watch')) }],
     // #879 integrity risk scores (docs §20): one idempotent upsert for staff review. HARIMU_RISK_SCORING_ENABLED; citizen POST path only, never a GET. Off: this runner does not run.

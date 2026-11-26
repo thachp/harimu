@@ -39,6 +39,7 @@ const flagOffPins = {
   HARIMU_TREATY_BREAK_ENABLED: 'treaty-breaks-1507.test.mjs', // #1507 flag off: world tick with diplomacy on writes no break
   HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED: 'war-loss-confidence-1515.test.mjs', // #1515 flag off: Confidence is decree-only and war_end_terms is not read
   HARIMU_EMBARGO_STABILITY_ENABLED: 'embargo-stability-1526.test.mjs', // #1526 flag off: Stability JSON is unchanged and embargoes is not read
+  HARIMU_CITY_EXPEDITION_TRAVEL_ENABLED: 'city-expedition-travel-1537.test.mjs', // #1537 flag off: founding SQL and 200 response are unchanged and city_expeditions is not read
 
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
