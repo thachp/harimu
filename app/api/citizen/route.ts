@@ -89,7 +89,7 @@ async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>
   const plan = await readAurelle(database, userId, { ...(decayOn ? { favorDecayAt: Math.floor(Date.now() / 1000) } : {}), ...(mealSeconds === undefined ? {} : { mealSeconds }) });
   const mintOn = crownMintOn(), tsrOn = aurelleTsrViewOn();
   if (!plan.available || (!mintOn && !tsrOn)) return plan;
-  const mint = await readCrownMint(database, Math.floor(Date.now() / 1000));
+  const mint = await readCrownMint(database, Math.floor(Date.now() / 1000), { warLoss: mintOn && flagOn(env, 'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED') && flagOn(env, 'HARIMU_WAR_ENDINGS_ENABLED') });
   return { ...plan, ...(mintOn ? { mint } : {}), ...(tsrOn ? { crownRateMilli: mint.officialRate.tesseraMilliPerCrown } : {}) };
 }
 /** #490: the generic nation wage plan, only while HARIMU_NATION_WORK_ENABLED is on and the citizen's nation has a wage ledger and is playable for the account. Otherwise no key at all. */

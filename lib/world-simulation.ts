@@ -196,7 +196,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
         options.religiousHarmony ? readHarmonyScores(db,Number(row.scheduled_at),holidays,festivalStance) : undefined,
         rationStability ? korundRationCutCities(db, epoch, Number(row.scheduled_at)) : undefined,
         rationRecoveryOn ? korundRationRecoveryCities(db, epoch, Number(row.scheduled_at)) : undefined,
-        confidenceOn ? readCrownConfidenceAt(db, Number(row.scheduled_at)) : undefined]);
+        confidenceOn ? readCrownConfidenceAt(db, Number(row.scheduled_at), { warLoss: flagOn(options.atlasEnv, 'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED') && flagOn(options.atlasEnv, 'HARIMU_WAR_ENDINGS_ENABLED') }) : undefined]);
       return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(rationCuts?{rationCuts}:{}),...(rationRecovery?{rationRecovery}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{}),...(crownConfidence!=null?{crownConfidence}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
