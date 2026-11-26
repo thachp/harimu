@@ -262,7 +262,9 @@
       // #1496: Aurelle Crown debasement decrees in the last 3 Crown game years lower Aurelle's World Reputation (docs §13.4). Off: Reputation is unchanged and crown_decrees is not read. Only acts when HARIMU_DIPLOMACY_ENABLED is on too. GRAY 100 (index 99), after battle terrain.
       "HARIMU_REPUTATION_DEBASEMENT_ENABLED": "true",
       // #1506: Aurelle Crown Currency Confidence feeds Aurelle's Stability (docs §10.1, §12.4). Off: Stability is unchanged and crown_decrees is not read by the stability step. Only acts when HARIMU_CROWN_DEBASEMENT_ENABLED is on too. After reputation debasement at the next dense index.
-      "HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED": "true"
+      "HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED": "true",
+      // #1507: the diplomacy world tick may break one in-force NAP per slot when the counterpart already has an in-force embargo against the breaker (docs §13.4, §13.5). Off: no production caller, identical to current dev. GRAY 102 (index 101), after Crown Confidence to Stability (index 100). Only acts when HARIMU_DIPLOMACY_ENABLED is on too.
+      "HARIMU_TREATY_BREAK_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
