@@ -19,3 +19,6 @@
 @keyframes zoom-path-square{from{opacity:.45}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.game-zoom-on .game-stage{animation:none}}
 html[data-harimu-reduced-motion] .game-zoom-on .game-stage{animation:none}
+/* #1445 slice 4b. The walk and drive canvases are position:fixed inside the inspector (z-index 4), so they paint over the crumbs. Drop that overlay's stacking context and lift only the crumb chip above the canvas. The chip stays under the HUD and inset from the canvas edge, so the focus ring and the minimap stay clear. Flag off: these classes are absent. */
+.harimu-game:is(.game-place-nav,.game-neighborhood-walk,.game-city-drive) .game-stage-overlay{z-index:auto}
+.harimu-game:is(.game-place-nav,.game-neighborhood-walk,.game-city-drive) .game-stage-overlay .game-zoom-path{position:relative;z-index:5}

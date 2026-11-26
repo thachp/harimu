@@ -1,7 +1,7 @@
 'use client';
 
 import { scopeNotice, type NoticeScope } from '@/lib/notice-scope';
-import { useEffect, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { nationMark, nationSymbolsEnabled, nationTheme } from '@/lib/nation-themes';
 import { nationSkin } from '@/lib/nation-skin';
 import { identityStatus, nationEmblem, topBarEmblemEnabled, uiV2TopbarEnabled } from '@/lib/nation-emblem';
@@ -38,7 +38,7 @@ import { uiV2WorldEnabled, worldCrestStripEnabled } from '@/lib/ui-v2-world';
 import { countryWord, railCurrent, railKeyTarget, railLevels, uiV2RailEnabled } from '@/lib/ui-v2-rail';
 import { clockZoomEnabled, isClockZoomLevel } from '@/lib/clock-zoom';
 import { resourceBarEnabled, resourceBarItems } from '@/lib/resource-bar';
-import { placeNavShown, placeRailCurrent, placeRailLevels, zoomPathCrumbs, zoomPathEnabled } from '@/lib/zoom-path';
+import { placeCrumbTargets, placeNavShown, placeRailCurrent, placeRailLevels, zoomPathCrumbs, zoomPathEnabled } from '@/lib/zoom-path';
 import { nationAccentApplies, nationAccentEnabled, nationChromeAccent } from '@/lib/nation-accent';
 import { cityStripHidden } from '@/lib/ui-v2-city';
 import { uiV2MobileEnabled } from '@/lib/ui-v2-mobile';
@@ -135,6 +135,10 @@ function usePhoneTwoTap(): boolean {
   return enabled && phone;
 }
 const worldTabFormId = 'world-tab-form';
+const emptySubscribe = () => () => {};
+const emptySearch = () => '';
+function sceneSearchNow() { return typeof window === 'undefined' ? '' : window.location.search; }
+function subscribeSceneSearch(onChange: () => void) { window.addEventListener('harimu-scenechange', onChange); window.addEventListener('popstate', onChange); return () => { window.removeEventListener('harimu-scenechange', onChange); window.removeEventListener('popstate', onChange); }; }
 const railIcons = { world: GlobeHemisphereWest, country: Compass, square: UsersThree, neighborhood: Path } as const; // #392 S4: the same icons the zoom tabs use today. #1445: Path marks Neighborhood.
 const places = [
   { id: 'world', name: 'World', icon: GlobeHemisphereWest },
@@ -254,7 +258,9 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
   const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation','military','economy','faith'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
   const zoomOn = zoomPathEnabled();
   const chrome = nationAccentEnabled() && nationAccentApplies(view) ? nationChromeAccent(nation.id) : null;
-  const zoomCrumbs = zoomOn ? zoomPathCrumbs({ view, nationLabel: shownNationName, cityLabel: viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City', nationId: viewedNationHeld ? undefined : nation.id, visitor, neighborhood: placeShown }) : null;
+  const sceneSearch = useSyncExternalStore(placeShown ? subscribeSceneSearch : emptySubscribe, placeShown ? sceneSearchNow : emptySearch, emptySearch); // #1445: district and city on the crumbs, only while place nav is shown
+  const crumbTargets = placeShown ? placeCrumbTargets(sceneSearch, nation.id, currentCityName, viewedNationHeld) : undefined;
+  const zoomCrumbs = zoomOn ? zoomPathCrumbs({ view, nationLabel: shownNationName, cityLabel: viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City', nationId: viewedNationHeld ? undefined : nation.id, visitor, neighborhood: placeShown, cityId: crumbTargets?.cityId, district: crumbTargets?.district }) : null;
   const zoomTrail = zoomCrumbs ? <nav className="game-zoom-path" aria-label="Zoom path">{zoomCrumbs.flatMap((crumb, index) => [index > 0 ? <span key={`${crumb.view}-sep`} className="game-zoom-path-sep" aria-hidden="true">&gt;</span> : null, crumb.current ? <span key={crumb.view} aria-current="page">{crumb.label}</span> : <a key={crumb.view} href={crumb.href} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return; event.preventDefault(); navigate(crumb.view); }}>{crumb.label}</a>])}</nav> : null;
   // #189: in Country the stage scrolls, so the location row and shift chip sit in its flow instead of floating over the heading and controls.
   const shiftChip = shiftSummary ? <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong>{shiftSummary.endsAt !== undefined ? <GameTimer compact endsAt={shiftSummary.endsAt * 1000} epochMs={worldClock ? worldClock.epochSeconds * 1000 : undefined} label="Shift" expiredText={shiftSummary.expiredText} /> : <span>Active shift</span>}<CaretRight /></button> : null;
