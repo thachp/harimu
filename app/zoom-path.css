@@ -22,3 +22,10 @@ html[data-harimu-reduced-motion] .game-zoom-on .game-stage{animation:none}
 /* #1445 slice 4b. The walk and drive canvases are position:fixed inside the inspector (z-index 4), so they paint over the crumbs. Drop that overlay's stacking context and lift only the crumb chip above the canvas. The chip stays under the HUD and inset from the canvas edge, so the focus ring and the minimap stay clear. Flag off: these classes are absent. */
 .harimu-game:is(.game-place-nav,.game-neighborhood-walk,.game-city-drive) .game-stage-overlay{z-index:auto}
 .harimu-game:is(.game-place-nav,.game-neighborhood-walk,.game-city-drive) .game-stage-overlay .game-zoom-path{position:relative;z-index:5}
+/* #1445 slice 4c. The crumb gets its own row above the globe, the drive and the walk, so the canvas and the minimap start below it. Nation keeps the crumb in the country header. Flag off: no .game-zoom-on. */
+@media(min-width:761px){
+  .harimu-game.game-zoom-on{--zoom-crumb:calc(52px * var(--text-scale, 1))}
+  .harimu-game.game-zoom-on:is(.game-zoom-world,.game-zoom-square,.game-zoom-neighborhood) .game-stage{top:calc(var(--hud-height) + var(--zoom-crumb))}
+  .harimu-game.game-zoom-on:is(.game-zoom-world,.game-zoom-square,.game-zoom-neighborhood) .game-stage-overlay{top:var(--hud-height);z-index:6;left:calc(var(--rail-width, 0px) + 12px);right:calc(var(--sidebar-width) + 12px);padding:6px 0 0}
+  .game-zoom-on.game-city-drive .city-drive-layer,.game-zoom-on.game-neighborhood-walk .neighborhood-walk-layer{top:calc(var(--hud-height) + var(--zoom-crumb))}
+}

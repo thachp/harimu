@@ -25,14 +25,18 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
       {cities.map((city, index) => {
         const count = presence?.find(entry => entry.cityId === city.id)?.present;
         const knownCount = Number.isInteger(count) && count! >= 0;
+        const presenceLine = knownCount ? `${count} sharing presence` : preview ? null : 'Online count unavailable';
+        const status = [city.capital ? 'Capital' : '', city.id === currentCityId ? 'Current' : '', city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ');
         return <button type="button" key={city.id} className={styles.pin} data-capital={bleed && city.capital ? 'true' : undefined}
-        style={{left:`clamp(calc(var(--pin-max) / 2), ${pins[index].x}%, calc(100% - var(--pin-max) / 2))`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
+        style={{left:`clamp(calc(var(--pin-max) / 2), ${pins[index].x}%, calc(100% - var(--pin-max) / 2))`,top:`clamp(var(--pin-edge, 0px), ${pins[index].y}%, calc(100% - var(--pin-edge, 0px)))`}} aria-pressed={destination?.id === city.id}
+        aria-label={[city.name, status, presenceLine].filter(Boolean).join(', ')}
         onClick={() => { if (!pending) setDestinationId(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
-        {bleed && city.capital ? <span className={styles.capitalMarker} aria-hidden="true" /> : null}<span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
-        <small>{knownCount ? `${count} sharing presence` : preview ? 'Presence shows in your own nation' : 'Online count unavailable'}</small>
+        {bleed && city.capital ? <span className={styles.capitalMarker} aria-hidden="true" /> : null}<span>{city.name}</span><small>{status}</small>
+        {presenceLine ? <small>{presenceLine}</small> : null}
       </button>; })}
     </div>
     {pending && <p id="city-travel-pending-reason" role="status">Your travel is being confirmed. Please wait before changing the destination.</p>}
+    {preview ? <small>Presence shows in your own nation</small> : null}
     <small>Static lore and illustrative geography · jobs and markets are shared. Presence is opt-in (90-second expiry, refreshed every 15 seconds, may include you).</small>
     {destination && <section className={styles.destination} aria-label="Travel destination" aria-live="polite">
       <h3>{destination.name}</h3><p>{destination.description}</p>
