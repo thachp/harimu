@@ -44,8 +44,9 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_NAP_REPUTATION_GATE_ENABLED'), 97); // #1495 is GRAY 99 at index 97, after trade renewal. indexOf only, no at(-1).
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BATTLE_TERRAIN_ENABLED'), 98); // #1491 follows the NAP gate (GRAY 98 at index 98). Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_REPUTATION_DEBASEMENT_ENABLED'), 99); // #1496 follows battle terrain at index 99 (GRAY 100). indexOf only, no length pin.
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AI_TREATY_EMBARGO_ENABLED'), 100); // #1505 follows debasement (GRAY 101 at index 100). indexOf only, no at(-1).
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 101);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED'), 100); // #1506 follows reputation debasement at index 100. indexOf only, no length pin.
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AI_TREATY_EMBARGO_ENABLED'), 101); // #1505 follows Crown confidence. indexOf only, no at(-1).
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 102);
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-1), 'HARIMU_WAR_EVACUATION_ENABLED'); // #1324 entry 10, after national service. Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-2), 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED'); // #1095 stays entry 9
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 13); // #1034 sea lanes and #1028 capture history stay inside the pack. #1285 festival host note is last
@@ -533,12 +534,16 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_REPUTATION_DEBASEMENT_ENABLED'), 99);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_REPUTATION_DEBASEMENT_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_REPUTATION_DEBASEMENT_ENABLED, 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AI_TREATY_EMBARGO_ENABLED'), 100);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AI_TREATY_EMBARGO_ENABLED'), 100);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED'), 100);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED'), 100);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED, 'false');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AI_TREATY_EMBARGO_ENABLED'), 101);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AI_TREATY_EMBARGO_ENABLED'), 101);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_AI_TREATY_EMBARGO_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_AI_TREATY_EMBARGO_ENABLED, 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length, 101);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length, 101);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length, 102);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length, 102);
   assert.equal(preview.vars.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, undefined, 'Varkand red-alert cancels is not its own binding');
   assert.equal(prod.vars.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, 'true');
