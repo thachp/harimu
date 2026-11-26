@@ -14,7 +14,7 @@ export type VoteEvent = { electionKey: string; voterId: string; senderId: string
 export type RiskAccount = { userId: string; score: number; reasons: string[]; civicActCount: number; updatedAt: number };
 export type SwitchEvent = { actor: string; persona: string; state: string; reason: string; createdAt: number };
 /** GET /api/admin/reports (#959): moderation_reports row. */
-export type ReportRow = { id: string; request_id: string; reporter_id: string; target_kind: string; target_id: string; reason_id: string; note: string | null; created_at: number };
+export type ReportRow = { id: string; request_id: string; reporter_id: string; target_kind: string; target_id: string; reason_id: string; note: string | null; created_at: number; target_snapshot: string | null };
 export type PanelResult =
   | { panel: 'ai-review-queue'; ok: true; items: ReviewItem[] }
   | { panel: 'ai-costs'; ok: true; days: CostDay[]; asOf: number; windowDays: number }

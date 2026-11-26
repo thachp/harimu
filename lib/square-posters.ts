@@ -8,6 +8,8 @@
 import type { GameDatabase } from './database-contract';
 import { capitalCityForNation, cityForNation } from './cities';
 import { flagOn } from './flag-pack.mjs';
+import { korundFogSquares, korundMapFogFlag } from './korund-map-fog';
+import { readWorldSquares } from './map-zones';
 import { korundWeeklyQuotaFood } from './korund-coupons';
 import { korundPlanWindow, planFulfilmentPercent } from './korund-plan-stats';
 import { jobById } from './labor-bureau-rules';
@@ -139,4 +141,27 @@ export async function applyPoster(db: GameDatabase, userId: string, command: Pos
       WHERE square_posters.clerk_user_id=excluded.clerk_user_id`).bind(command.x, command.y, userId, kit.nationId, frame.id, slogan.id, command.requestId, now),
   ]);
   return { ok: true, poster: { frameId: frame.id, sloganId: slogan.id, text } };
+}
+
+/** Canonical `{x},{y}` form already used by fog keys. Leading zeros and spaces are rejected. */
+export function parsePosterTargetId(id: string): { x: number; y: number } | null {
+  const match = /^(-?\d+),(-?\d+)$/.exec(id);
+  if (!match) return null;
+  const x = Number(match[1]), y = Number(match[2]);
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || `${x},${y}` !== id) return null;
+  return { x, y };
+}
+/** Flag off: undefined (caller leaves the payload unchanged). Fog-hidden or missing: null, and a hidden square does not query square_posters. */
+export async function readVisiblePoster(db: GameDatabase, userId: string, x: number, y: number, env: unknown, now = Math.floor(Date.now() / 1000)): Promise<(PosterView & { mine: boolean }) | null | undefined> {
+  if (!postersEnabled(env)) return undefined;
+  if (flagOn(env, korundMapFogFlag)) {
+    const nation = (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id;
+    if (nation === 'korund') {
+      const visible = new Set(korundFogSquares((await readWorldSquares(db)).squares).map(square => `${square.x},${square.y}`));
+      if (!visible.has(`${x},${y}`)) return null;
+    }
+  }
+  const row = await db.prepare('SELECT clerk_user_id,frame_id,slogan_id FROM square_posters WHERE x=? AND y=?').bind(x, y).first<{ clerk_user_id: string; frame_id: string; slogan_id: string }>();
+  if (!row) return null;
+  return { frameId: row.frame_id, sloganId: row.slogan_id, text: (await filledText(db, row.clerk_user_id, row.slogan_id, now)) ?? textOf(row.slogan_id), mine: row.clerk_user_id === userId };
 }
