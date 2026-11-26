@@ -193,9 +193,12 @@ const festivalHost=async(db:Awaited<ReturnType<typeof getDatabase>>,nationId:str
 /** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads.
  *  #1078: HARIMU_WAR_PEACE_REVERT_ENABLED off does not read city_treaty_returns, so the history object stays the capture alone. */
 async function cityReads(db:Awaited<ReturnType<typeof getDatabase>>,userId:string,nationId:string,cityId:string,now:number){
- if(!flagOn(env,'HARIMU_CITY_CAPTURE_HISTORY_ENABLED'))return {presence:await cityPresence(db,nationId,now),coResidents:await cityCoResidents(db,userId,nationId,cityId,now)};
- const [presence,coResidents,captureHistory]=await Promise.all([cityPresence(db,nationId,now),cityCoResidents(db,userId,nationId,cityId,now),latestCityCapture(db,nationId,cityId)]);
- if(!captureHistory||!peaceRevertEnabled(env))return {presence,coResidents,...(captureHistory?{captureHistory}:{})};
+ const includeResidentIds=flagOn(env,'HARIMU_REPORTS_ENABLED');
+ const residents=()=>cityCoResidents(db,userId,nationId,cityId,now,{includeResidentIds});
+ const pack=<T extends {coResidents:unknown}>(reads:T)=>includeResidentIds?{...reads,reportsEnabled:true}:reads;
+ if(!flagOn(env,'HARIMU_CITY_CAPTURE_HISTORY_ENABLED'))return pack({presence:await cityPresence(db,nationId,now),coResidents:await residents()});
+ const [presence,coResidents,captureHistory]=await Promise.all([cityPresence(db,nationId,now),residents(),latestCityCapture(db,nationId,cityId)]);
+ if(!captureHistory||!peaceRevertEnabled(env))return pack({presence,coResidents,...(captureHistory?{captureHistory}:{})});
  const treatyReturn=await cityTreatyReturn(db,nationId,cityId);
- return {presence,coResidents,captureHistory:treatyReturn?{...captureHistory,treatyReturn}:captureHistory};
+ return pack({presence,coResidents,captureHistory:treatyReturn?{...captureHistory,treatyReturn}:captureHistory});
 }

@@ -23,8 +23,8 @@ test('limits: labels 40 and lines (with accessible names) 80; no placeholders an
   for (const x of lines()) assert.ok(x.length<=REPORT_LINE_MAX,`${x} (${x.length})`);
   for (const x of all()) assert.doesNotMatch(x,/\{|\}/,x);
 });
-test('every key is present: five targets with a label and accessible name, the shared header, six reasons, note, actions and three states; every line a proposal', () => {
-  assert.deepEqual([...REPORT_TARGET_IDS],['citizen-message','ai-leader-address','ai-news','notable-reply','square-poster']); assert.deepEqual(TG.map(x=>x.id),[...REPORT_TARGET_IDS]);
+test('every key is present: six targets with a label and accessible name, the shared header, six reasons, note, actions and three states; every line a proposal', () => {
+  assert.deepEqual([...REPORT_TARGET_IDS],['citizen-message','ai-leader-address','ai-news','notable-reply','square-poster','citizen-name']); assert.deepEqual(TG.map(x=>x.id),[...REPORT_TARGET_IDS]);
   assert.deepEqual([...REPORT_REASON_IDS],['real-world-politics','hate-harassment','threats-danger','sexual-content','ai-inappropriate','spam-other']); assert.deepEqual(RS.map(x=>x.id),[...REPORT_REASON_IDS]);
   for (const x of TG) { assert.equal(x.proposal,true); assert.equal(reportTargetFor(x.id),x); assert.ok(x.entryLabel.length>0&&x.accessibleName.length>0); assert.notEqual(x.entryLabel,x.accessibleName); }
   for (const x of RS) { assert.equal(x.proposal,true); assert.equal(typeof x.aiOnly,'boolean'); }
@@ -42,7 +42,7 @@ test('no in-game mechanics wording: no Suspicion, informing, denunciation, surve
 });
 test('the AI-only reason is marked, is the only one, and shows for AI targets only', () => {
   assert.deepEqual(RS.filter(x=>x.aiOnly).map(x=>x.id),['ai-inappropriate']); assert.equal(RS.find(x=>x.id==='ai-inappropriate').label,'AI said something it shouldn\'t');
-  assert.deepEqual(TG.filter(x=>x.aiTarget).map(x=>x.id),['ai-leader-address','ai-news','notable-reply']); assert.equal(reportTargetFor('citizen-message').aiTarget,false); assert.equal(reportTargetFor('square-poster').aiTarget,false);
+  assert.deepEqual(TG.filter(x=>x.aiTarget).map(x=>x.id),['ai-leader-address','ai-news','notable-reply']); assert.equal(reportTargetFor('citizen-message').aiTarget,false); assert.equal(reportTargetFor('square-poster').aiTarget,false); assert.equal(reportTargetFor('citizen-name').aiTarget,false);
   assert.equal(reasonsFor('citizen-message').length,5); assert.equal(reasonsFor('citizen-message').some(x=>x.id==='ai-inappropriate'),false);
   for (const id of ['ai-leader-address','ai-news','notable-reply']) { assert.equal(reasonsFor(id).length,6); assert.ok(reasonsFor(id).some(x=>x.id==='ai-inappropriate')); }
   assert.deepEqual(reasonsFor('ai-news').map(x=>x.id),[...REPORT_REASON_IDS]);
@@ -51,7 +51,7 @@ test('reasons follow 21.1 and 21.4: real-world politics, hate or harassment, thr
   assert.match(RS[0].label,/Real-world politics/); assert.match(RS[1].label,/Hate or harassment/); assert.match(RS[2].label,/Threats/); assert.match(RS[2].label,/personal details/); assert.match(RS[3].label,/Sexual content/); assert.match(RS[5].label,/Spam/);
 });
 test('the AI targets are named as AI and the Notable reply is named only where the docs name it', () => {
-  assert.match(reportTargetFor('ai-leader-address').accessibleName,/AI leader address/); assert.match(reportTargetFor('ai-news').accessibleName,/AI-written news/); assert.match(reportTargetFor('citizen-message').accessibleName,/chat message/); assert.match(reportTargetFor('square-poster').accessibleName,/square poster/);
+  assert.match(reportTargetFor('ai-leader-address').accessibleName,/AI leader address/); assert.match(reportTargetFor('ai-news').accessibleName,/AI-written news/); assert.match(reportTargetFor('citizen-message').accessibleName,/chat message/); assert.match(reportTargetFor('square-poster').accessibleName,/square poster/); assert.match(reportTargetFor('citizen-name').accessibleName,/citizen name/);
   assert.match(reportTargetFor('notable-reply').accessibleName,/Notable reply/);
   for (const x of all()) if (/Notable/.test(x)) assert.equal(x,reportTargetFor('notable-reply').accessibleName);
   for (const x of TG) assert.match(x.accessibleName,/Harimu moderators/);

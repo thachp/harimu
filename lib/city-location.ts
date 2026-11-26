@@ -45,8 +45,8 @@ export async function cityPresence(db:GameDatabase,nationId:string,now:number){
  return effective===city.id;
  }).length}));
 }
-/** #75: who else lives in this city. Humans appear once they have a city location row, i.e. after opening the city screen (GET /api/city). Public fields only: no user ids, wallets or coordinates. */
-export type CoResident={key:string;name:string;nationId:string;kind:'human'|'ai';status:'working'|'idle';you:boolean};
+/** #75: who else lives in this city. Humans appear once they have a city location row, i.e. after opening the city screen (GET /api/city). Public fields only: no wallets or coordinates. #1531: other humans may carry `id` (clerk_user_id) when reports are on; self and AI never do. */
+export type CoResident={key:string;name:string;nationId:string;kind:'human'|'ai';status:'working'|'idle';you:boolean;id?:string};
 export const coResidentHumanLimit=12,coResidentAiSample=3;
 // #165: the AI cast is the nation's full Notable list (primary + #148 roster, active since #151), sampled per city below.
 const aiCast=(nationId:string):readonly {id:string;name:string}[]=>nationNotables(nationId);
@@ -57,11 +57,11 @@ export function aiCoResidents(nationId:string,cityId:string,now:number,roster:re
  const hour=Math.floor(now/3600);
  return cast.map(ai=>({key:`ai:${ai.id}`,name:ai.name,nationId,kind:'ai',status:hash(`${ai.id}:${cityId}:${hour}`)%2?'working':'idle',you:false}));
 }
-export async function cityCoResidents(db:GameDatabase,viewerId:string,nationId:string,cityId:string,now:number):Promise<CoResident[]>{
+export async function cityCoResidents(db:GameDatabase,viewerId:string,nationId:string,cityId:string,now:number,opts?:{includeResidentIds?:boolean}):Promise<CoResident[]>{
  if(!cityForNation(nationId,cityId))return [];
  const rows=await db.prepare(`SELECT c.clerk_user_id AS id,c.display_name AS name,EXISTS(SELECT 1 FROM work_shifts s WHERE s.clerk_user_id=c.clerk_user_id AND s.claimed_at IS NULL AND s.completes_at>?) AS working
  FROM citizens c JOIN citizen_city_locations l ON l.user_id=c.clerk_user_id AND l.nation_id=c.nation_id
  WHERE c.nation_id=? AND l.current_city_id=? ORDER BY CASE WHEN c.clerk_user_id=? THEN 0 ELSE 1 END,l.updated_at DESC LIMIT ?`).bind(new Date(now*1000).toISOString(),nationId,cityId,viewerId,coResidentHumanLimit).all<{id:string;name:string|null;working:number|boolean}>();
- const humans=rows.results.map((row,index):CoResident=>({key:`h:${index}`,name:row.name?.trim()||'Citizen',nationId,kind:'human',status:Number(row.working)?'working':'idle',you:row.id===viewerId}));
+ const humans=rows.results.map((row,index):CoResident=>{const you=row.id===viewerId;return {key:`h:${index}`,name:row.name?.trim()||'Citizen',nationId,kind:'human',status:Number(row.working)?'working':'idle',you,...(opts?.includeResidentIds&&!you?{id:row.id}:{})};});
  return [...humans,...aiCoResidents(nationId,cityId,now)];
 }
