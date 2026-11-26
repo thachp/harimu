@@ -1,9 +1,9 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
-import { kindleSeats } from './diplomacy';
-import { cleanTreatyLabel, treatyActorMax, type Ratification, type TreatyNationId } from './diplomacy-rules';
+import { bindAiTreatyEmbargoes, kindleSeats } from './diplomacy';
+import { cleanTreatyLabel, treatyActorMax, treatyAiLeaders, treatySlot, worldReputationBreaksSql, type Ratification, type TreatyNationId } from './diplomacy-rules';
 import { EMBARGO_NAME_MAX, pressFor, tradeClosed } from './embargo-copy';
-import { embargoNationNames, embargoPairKey, embargoRatification, embargoRequestIdOk, embargoStatus, isEmbargoNation, type EmbargoDbStatus, type EmbargoStatus } from './embargo-rules';
+import { aiEmbargoCandidates, aiEmbargoLifts, aiEmbargoRequestId, embargoNationNames, embargoPairKey, embargoRatification, embargoRequestIdOk, embargoStatus, isEmbargoNation, type AiEmbargoBreak, type AiEmbargoRow, type AiEmbargoTreaty, type EmbargoDbStatus, type EmbargoStatus } from './embargo-rules';
 export * from './embargo-rules';
 
 /** #363: embargo PoC (a bilateral trade cut between two MVP nations) behind HARIMU_EMBARGO_ENABLED (default "false"). Canon: harimu-docs 13.1, 13.3 (see
@@ -90,6 +90,36 @@ export async function decideProposedEmbargoes(db: GameDatabase, now: number) {
 
 /** World tick (HARIMU_EMBARGO_ENABLED on): decide pending proposals. */
 export async function runEmbargo(db: GameDatabase, now: number) { await decideProposedEmbargoes(db, now); }
+
+// [ASSUMPTION] docs §8.3: the docs make embargoes a major LLM decision, and this deterministic cron is the MVP stand-in.
+/** #1505: one embargo proposal per treaty slot, plus any due lifts. Flag off (caller passes enabled: false): no proposal and no lift. */
+export async function runAiTreatyEmbargoes(db: GameDatabase, now: number, options: { enabled: boolean }) {
+  if (!options.enabled) return { status: 'disabled' as const, proposed: false, lifted: 0 };
+  type BreakRow = { id: string; broken_by: string | null; kind: string; proposer_nation: string; other_nation: string; ended_at: number | null; n: number };
+  type LiveRow = { id: string; request_id: string; actor_nation: TreatyNationId; target_nation: TreatyNationId; status: EmbargoDbStatus; decided_at: number | null };
+  type TreatyRow = { kind: string; status: string; proposer_nation: string; other_nation: string; ends_at: number | null };
+  const empty = <T>() => ({ results: [] as T[] });
+  const breaks = (await db.prepare(worldReputationBreaksSql).all<BreakRow>().catch(tolerate(isMissingRelation, empty<BreakRow>()))).results;
+  const embargoes = (await db.prepare("SELECT id,request_id,actor_nation,target_nation,status,decided_at FROM embargoes WHERE status IN ('proposed','in_force','rejected')").all<LiveRow>().catch(tolerate(isMissingRelation, empty<LiveRow>()))).results;
+  const treaties = (await db.prepare("SELECT kind,status,proposer_nation,other_nation,ends_at FROM treaties WHERE status='in_force'").all<TreatyRow>().catch(tolerate(isMissingRelation, empty<TreatyRow>()))).results;
+  const breakInputs: AiEmbargoBreak[] = breaks.map(row => ({ kind: row.kind, status: 'broken', proposer: row.proposer_nation, other: row.other_nation, brokenBy: row.broken_by, endedAt: num(row.ended_at) }));
+  const embargoInputs: AiEmbargoRow[] = embargoes.map(row => ({ id: row.id, requestId: row.request_id, actor: row.actor_nation, target: row.target_nation, status: row.status, decidedAt: num(row.decided_at) }));
+  const treatyInputs: AiEmbargoTreaty[] = treaties.map(row => ({ kind: row.kind, status: row.status, proposer: row.proposer_nation, other: row.other_nation, endsAt: num(row.ends_at) }));
+  const liftedIds = new Set<string>();
+  for (const item of aiEmbargoLifts(now, embargoInputs.filter(row => row.requestId?.startsWith('ai-embargo-')), breakInputs, treatyInputs)) {
+    const result = await liftEmbargo(db, item.id, item.actor, now, true);
+    if (result.ok) liftedIds.add(item.id);
+  }
+  const after = embargoInputs.map(row => row.id && liftedIds.has(row.id) ? { ...row, status: 'lifted' } : row);
+  const slot = treatySlot(now);
+  const taken = await db.prepare('SELECT 1 AS found FROM embargoes WHERE request_id LIKE ?').bind(`ai-embargo-${slot}-%`).first().catch(tolerate(isMissingRelation, null));
+  if (taken) return { status: 'ok' as const, proposed: false, lifted: liftedIds.size };
+  const [chosen] = aiEmbargoCandidates(now, breakInputs, after, treatyInputs);
+  if (!chosen) return { status: 'ok' as const, proposed: false, lifted: liftedIds.size };
+  const result = await proposeEmbargo(db, { actor: chosen.actor, target: chosen.target, proposedBy: treatyAiLeaders[chosen.actor], requestId: aiEmbargoRequestId(slot, chosen.actor, chosen.target) }, now, { enabled: true });
+  return { status: 'ok' as const, proposed: result.ok === true && !('replay' in result && result.replay), lifted: liftedIds.size };
+}
+bindAiTreatyEmbargoes(runAiTreatyEmbargoes);
 
 /** Server-side only: the imposing nation lifts its own in-force embargo (the target cannot). [ASSUMPTION] no vote is needed to lift. */
 export async function liftEmbargo(db: GameDatabase, embargoId: string, liftingNation: string, now: number, enabled: boolean) {

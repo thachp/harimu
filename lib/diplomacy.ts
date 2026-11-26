@@ -1,5 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
+import { flagOn } from './flag-pack.mjs';
 import { gameTimeCompression } from './game-time';
 import { assemblyIncumbents } from './assembly-rules';
 import { brokenPactLine, ratificationFor, ratificationHeadlines, treatyStatusLines, DIPLOMACY_NAME_MAX, type RatificationKey } from './diplomacy-copy';
@@ -7,6 +8,10 @@ import { gameYear } from './crown-debasement-rules';
 import { cleanTreatyLabel, decideTreaty, isTreatyKind, isTreatyNation, treatyActorMax, treatyKindNames, treatyNationNames, treatyPairKey, treatyRequestIdOk, treatyStatus, treatyTermSeconds, treatyBreakPenaltyFor, treatyAiLeaders, treatyCandidates, treatyProposalCooldownSlots, treatyProposalRequestId, treatyProposalSlotSeconds, treatySlot,
   worldReputationBreaksSql, worldReputationFromBreaks, worldLegitimacyFromBreaks, withWorldReputationRecord, debasementCountInWindow, withDebasementReputation, renewalWindowSeconds, renewedTerm, treatyRenewalRequestId, type PartySeats, type Ratification, type TreatyDbStatus, type TreatyBreakPenalty, type TreatyKind, type TreatyNationId, type TreatyStatus, type WorldReputationMap } from './diplomacy-rules';
 export * from './diplomacy-rules';
+
+/** #1505: lib/embargo.ts registers this after both modules have loaded, so diplomacy does not import embargo (that cycle drops the reputation record). */
+let runAiTreatyEmbargo: ((db: GameDatabase, now: number, options: { enabled: boolean }) => Promise<unknown>) | null = null;
+export function bindAiTreatyEmbargoes(run: NonNullable<typeof runAiTreatyEmbargo>) { runAiTreatyEmbargo = run; }
 
 /** #308: AI treaties PoC (non-aggression pact, trade agreement) behind HARIMU_DIPLOMACY_ENABLED (default "false"). Canon: harimu-docs 13.1, 13.2
  *  (see lib/diplomacy-rules.ts). Treaties are written only by server code (a proposal from the AI leadership path, the world tick that decides
@@ -211,9 +216,14 @@ export async function runAiTreatyProposals(db: GameDatabase, now: number, option
   }
   return { status: 'none' as const };
 }
-/** The scheduled Worker's entry: reads the two flags from the bindings (both default off). */
-export async function runDiplomacyCron(db: GameDatabase, now: number, bindings: { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }) {
-  return runAiTreatyProposals(db, now, { enabled: bindings.HARIMU_DIPLOMACY_ENABLED === 'true', embargo: bindings.HARIMU_EMBARGO_ENABLED === 'true' });
+/** The scheduled Worker's entry. Treaty proposals need diplomacy. When HARIMU_AI_TREATY_EMBARGO_ENABLED is on, #1507 breaks one triggered NAP before #1505, so a break recorded this pass is visible to the embargo decision. That flag off: this cron does not break and does not embargo. The embargo also needs HARIMU_EMBARGO_ENABLED. */
+export async function runDiplomacyCron(db: GameDatabase, now: number, bindings: { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string; HARIMU_TREATY_BREAK_ENABLED?: string; HARIMU_AI_TREATY_EMBARGO_ENABLED?: string; HARIMU_GRAY_PACK?: unknown }) {
+  const diplomacyOn = bindings.HARIMU_DIPLOMACY_ENABLED === 'true';
+  const aiEmbargoOn = flagOn(bindings, 'HARIMU_AI_TREATY_EMBARGO_ENABLED');
+  const proposals = await runAiTreatyProposals(db, now, { enabled: diplomacyOn, embargo: bindings.HARIMU_EMBARGO_ENABLED === 'true' });
+  if (diplomacyOn && aiEmbargoOn && flagOn(bindings, 'HARIMU_TREATY_BREAK_ENABLED')) await breakDueNonAggressionPacts(db, now);
+  if (runAiTreatyEmbargo) await runAiTreatyEmbargo(db, now, { enabled: diplomacyOn && bindings.HARIMU_EMBARGO_ENABLED === 'true' && aiEmbargoOn });
+  return proposals;
 }
 
 /** #1495: rejected non-aggression pacts whose stored ratification includes reason: 'low_reputation'. Newest first. Flag off: the caller does not call this. The LIMIT 20 is display-only (Foreign affairs refusal lines) and is not a score source; ratification uses uncapped readWorldReputation. */

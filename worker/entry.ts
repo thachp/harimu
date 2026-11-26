@@ -44,7 +44,8 @@ const worker = {
     if (on.cabinet) ctx.waitUntil((async () => runCabinetCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
       .then(() => undefined, error => { console.warn('[cron] AI Cabinet responses failed', error instanceof Error ? error.name : 'unknown'); }));
     // #400: scheduled AI-leader treaty proposals; a no-op unless HARIMU_DIPLOMACY_ENABLED is "true" (default "false").
-    if (on.diplomacy) ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }))()
+    // #1505: that call also breaks one triggered NAP (#1507) before it proposes or lifts an AI treaty embargo, when those flags, diplomacy and embargo are on.
+    if (on.diplomacy) ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string; HARIMU_TREATY_BREAK_ENABLED?: string; HARIMU_AI_TREATY_EMBARGO_ENABLED?: string; HARIMU_GRAY_PACK?: unknown }))()
       .then(() => undefined, error => { console.warn('[cron] AI treaty proposals failed', error instanceof Error ? error.name : 'unknown'); }));
     // #362: the AI Monarch's yearly Crown debasement decree; a no-op unless HARIMU_CROWN_DEBASEMENT_ENABLED="true". Never runs on a read.
     if (on.crown) ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: flagOn(env, 'HARIMU_CROWN_DEBASEMENT_ENABLED'), emissionCaps: (env as unknown as { HARIMU_EMISSION_CAPS_ENABLED?: string }).HARIMU_EMISSION_CAPS_ENABLED === 'true' }))()
