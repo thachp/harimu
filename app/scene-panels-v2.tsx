@@ -24,6 +24,7 @@ import { cityHeaderHyphenKeepEnabled } from '@/lib/city-header-hyphen-keep';
 import { cityCapitalRowDedupeEnabled } from '@/lib/city-capital-row-dedupe';
 import { cityPlaceIcon } from './city-pill';
 import { neighborhoodEnabled } from '@/lib/neighborhood';
+import { placeNavShown } from '@/lib/place-nav';
 import { desktopGateEnabled } from '@/lib/desktop-gate';
 import { districtIndex, districtLabels, neighborhoodWalkEnabled, rememberDistrict } from '@/lib/neighborhood-walk';
 import { neighborhoodTalkEnabled } from '@/lib/neighborhood-talk';
@@ -118,7 +119,7 @@ export function NeighborhoodSummary({ cityName, nation, destinations, residents,
   if (!enabled) return null;
   const nearby = destinations.filter(card => card.id === 'workplace' || card.id === 'market');
   const back = onWalk ? districtLabels(slots)[districtIndex('', slots)] : '';
-  const walkBack = onWalk && back ? [{ id: 'walk', label: back, detail: `${cityName} · ${nation.name}`, icon: districtIcon(back, 16), onSelect: onWalk }] : [];
+  const walkBack = onWalk && back ? [{ id: 'walk', label: back, detail: placeNavShown() ? 'Back to the walk' : `${cityName} · ${nation.name}`, icon: districtIcon(back, 16), onSelect: onWalk }] : [];
   const rows = [...walkBack, ...nearby.map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: cityPlaceIcon(card.id), onSelect: () => onView(card.id) }))];
   return <div className="neighborhood-v2"><PanelV2 title="Neighborhood" subtitle={`${cityName} · ${nation.name}`} household={{ lead: nation.id ? <NationCrest id={nation.id} size={44} force /> : null }} rowsLabel="City destinations" rows={rows} stats={[]} /><CityCoResidents residents={residents} cityName={cityName} /></div>;
 }
