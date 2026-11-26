@@ -1,4 +1,4 @@
-/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is index 101, after Crown confidence. #1512 is not on this dev. */
+/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is last at index 102, after treaty break (#1507, index 101). */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -65,15 +65,20 @@ describe('#1505', { concurrency: 1 }, () => {
     assert.deepEqual(lifts([row('e-k', 'korund', 'aurelle'), row('e-a', 'aurelle', 'kindle')], []), ['e-a', 'e-k']);
   });
 
-  test('the flag is preview true, production false, and index 101 after Crown confidence', () => {
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED'), 100);
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 101);
+  test('the flag is preview true, production false, and last at index 102 after treaty break', () => {
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TREATY_BREAK_ENABLED'), 101);
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 102);
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), FLAG_PACKS.HARIMU_GRAY_PACK.length - 1);
     const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
     assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 101);
-    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 101);
+    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 102);
+    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 102);
+    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), Object.keys(preview.vars.HARIMU_GRAY_PACK).length - 1);
+    const cron = readFileSync('lib/diplomacy.ts', 'utf8');
+    const body = cron.slice(cron.indexOf('export async function runDiplomacyCron'));
+    assert.ok(body.indexOf('breakDueNonAggressionPacts') >= 0 && body.indexOf('breakDueNonAggressionPacts') < body.indexOf('runAiTreatyEmbargo'), 'treaty break runs before the AI embargo in the same cron pass');
     assert.doesNotMatch(readFileSync('app/api/world/route.ts', 'utf8'), /runAiTreatyEmbargoes|aiEmbargoCandidates/);
     assert.doesNotMatch(readFileSync('app/api/citizen/route.ts', 'utf8'), /runAiTreatyEmbargoes/);
     assert.doesNotMatch(readFileSync('app/api/news/route.ts', 'utf8'), /runAiTreatyEmbargoes/);
@@ -183,6 +188,23 @@ describe('#1505', { concurrency: 1 }, () => {
       const want = aiEmbargoRequestId(treatySlot(now), 'kindle', 'aurelle');
       const found = (await r.db.prepare('SELECT request_id FROM embargoes').all()).results.some(row => row.request_id === want);
       assert.equal(found, true, 'more than 20 breaks still proposes the uncapped in-window break');
+    });
+
+    test(`#1505 (${backend}): one cron pass breaks the NAP before the embargo decision, so the break keeps the AI embargo`, async t => {
+      const r = await localRuntime({ backend }); t.after(() => r.close());
+      const d = await r.importModule('lib/diplomacy.ts');
+      await r.importModule('lib/embargo.ts');
+      const now = Math.floor(r.now / 1000);
+      const ends = now + 90 * 86400;
+      await r.db.prepare("INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,broken_by) VALUES ('t-order','req-order-1505','aurelle:kindle','non-aggression','kindle','aurelle',?,?,'in_force',?,?,?,NULL,NULL)").bind(treatyAiLeaders.kindle, now - 10, now - 10, now - 10, ends).run();
+      await r.db.prepare("INSERT INTO embargoes (id,request_id,pair_key,actor_nation,target_nation,proposed_by,proposed_at,status,decided_at,imposed_at) VALUES ('e-order','ai-embargo-order','aurelle:kindle','kindle','aurelle',?,?,'in_force',?,?)").bind(treatyAiLeaders.kindle, now - 8, now - 8, now - 8).run();
+      await d.runDiplomacyCron(r.db, now, { HARIMU_DIPLOMACY_ENABLED: 'true', HARIMU_EMBARGO_ENABLED: 'true', HARIMU_TREATY_BREAK_ENABLED: 'true', HARIMU_GRAY_PACK: { [FLAG]: 'true' } });
+      const treaty = await r.db.prepare("SELECT status, broken_by, ended_at FROM treaties WHERE id='t-order'").first();
+      const embargo = await r.db.prepare("SELECT status FROM embargoes WHERE id='e-order'").first();
+      assert.equal(treaty.status, 'broken', 'the cron breaks the NAP');
+      assert.equal(treaty.broken_by, 'aurelle');
+      assert.equal(Number(treaty.ended_at), now);
+      assert.equal(embargo.status, 'in_force', 'the break recorded this pass is visible, so the AI embargo stays');
     });
   }
 

@@ -6,12 +6,13 @@ import { readCityLocation } from '@/lib/city-location';
 import { travelBlock } from '@/lib/travel';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
+import { chatBanRefusal } from '@/lib/chat-ban';
 import { cityChatFlagOn, postCityChatBinds, postCityChatSql, readCityChat } from '@/lib/city-chat';
 
 // #881: city chat. Flag HARIMU_CITY_CHAT_ENABLED off: 404 before auth or any DB access.
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const vars = () => env as unknown as { HARIMU_CHAT_SHADOW_MUTE?: string; HARIMU_TRAVEL_ENABLED?: string; HARIMU_REPORTS_ENABLED?: string };
+const vars = () => env as unknown as { HARIMU_CHAT_BAN?: string; HARIMU_CHAT_SHADOW_MUTE?: string; HARIMU_TRAVEL_ENABLED?: string; HARIMU_REPORTS_ENABLED?: string };
 const now = () => Math.floor(Date.now() / 1000);
 async function citizen(request: Request) {
   const userId = await authenticatedUserId(request);
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
   const text = body.text.trim();
   const blocked = await travelBlock(db, userId, t, vars().HARIMU_TRAVEL_ENABLED === 'true'); if (blocked) return json({ error: blocked, reason: 'traveling' }, 409);
   const same = (row: { user_id: string; body: string; city_id: string; deleted: number } | null) => row && row.user_id === userId && row.body === text && row.city_id === currentCityId && !row.deleted;
+  const banned = chatBanRefusal(vars().HARIMU_CHAT_BAN, userId, t, 'city'); if (banned) return json(banned, 403); // #1517
   const prior = await db.prepare('SELECT user_id,body,city_id,deleted FROM city_chat_messages WHERE id=?').bind(id).first<{ user_id: string; body: string; city_id: string; deleted: number }>();
   if (prior) return same(prior) ? view(db, userId, nationId, t) : json({ error: 'Request already used.' }, 409);
   await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId, `Citizen-${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`).run();
