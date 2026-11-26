@@ -1,6 +1,6 @@
 /** #1517 (docs Moderation & Safety §21.3 "temporary chat bans"; follow-up to #790): chat bans from the operator var HARIMU_CHAT_BAN,
  *  comma-separated entries `citizenId@startISO..endISO`. The end is required (a ban is temporary) and a window may last at most 30 days.
- *  While start <= now < end, the seven chat POST routes refuse the citizen's `post` with 403 chat_banned; own-post `delete` and every GET still work.
+ *  While start <= now < end, the seven chat POST routes refuse the citizen's `post` with 403 chat_banned, and POST /api/square action=presence with active:true is refused the same way; own-post `delete`, presence clear (active:false) and every GET still work.
  *  Same rules as HARIMU_CHAT_SHADOW_MUTE: id pattern, 90-entry cap, reserved words, ISO 8601 with a zone and whole seconds, no overlapping windows
  *  of one id, empty entries ignored. A malformed var fails safe: it bans nobody and logs one warning. No imports (plain-node scripts may load this). */
 export const chatBanIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
