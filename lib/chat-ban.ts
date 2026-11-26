@@ -1,6 +1,6 @@
 /** #1517 (docs Moderation & Safety §21.3 "temporary chat bans"; follow-up to #790): chat bans from the operator var HARIMU_CHAT_BAN,
  *  comma-separated entries `citizenId@startISO..endISO`. The end is required (a ban is temporary) and a window may last at most 30 days.
- *  While start <= now < end, the seven chat POST routes refuse the citizen's `post` with 403 chat_banned, and POST /api/square action=presence with active:true is refused the same way; own-post `delete`, presence clear (active:false) and every GET still work.
+ *  While start <= now < end, the seven chat POST routes refuse the citizen's `post` with 403 chat_banned, and POST /api/square action=presence with active:true is refused the same way; authenticated square GET/POST also delete that citizen's square_presence row so it does not linger until expires_at. Own-post `delete`, presence clear (active:false) and every GET still work.
  *  Same rules as HARIMU_CHAT_SHADOW_MUTE: id pattern, 90-entry cap, reserved words, ISO 8601 with a zone and whole seconds, no overlapping windows
  *  of one id, empty entries ignored. A malformed var fails safe: it bans nobody and logs one warning. No imports (plain-node scripts may load this). */
 export const chatBanIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
@@ -49,6 +49,12 @@ export function parseChatBan(raw: unknown, warn: (message: string) => void = mes
 /** The end (unix seconds) of the window containing `now` (start <= now < end), or null. */
 export const chatBanUntil = (bans: ReadonlyMap<string, readonly BanWindow[]>, userId: string, now: number): number | null =>
   (bans.get(userId) ?? []).find(w => now >= w.from && now < w.to)?.to ?? null;
+/** Citizen ids whose window contains `now`. Empty when the var is unset, empty, or malformed (bans nobody). */
+export const chatBanActiveIds = (raw: unknown, now: number): string[] => {
+  if (raw === undefined || raw === '') return [];
+  const bans = parseChatBan(raw);
+  return [...bans.keys()].filter(id => chatBanUntil(bans, id, now) !== null);
+};
 /** Route helper: the 403 body for a banned poster (and one structured log line, never the message text), or null. */
 export function chatBanRefusal(raw: unknown, userId: string, now: number, channel: string, log: (line: string) => void = line => console.info(line)): { reason: 'chat_banned'; error: string } | null {
   if (raw === undefined || raw === '') return null;

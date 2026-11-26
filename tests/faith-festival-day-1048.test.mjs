@@ -9,7 +9,7 @@ import { nextFaithFestivalAt } from '../lib/faith-festival-hud.ts';
 
 const require = createRequire(import.meta.url);
 const jsx = async (file) => ts.transpileModule(await readFile(new URL(file, import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
-const react = { useState: (initial) => [initial, () => {}], useEffect() {} };
+const react = { useState: (initial) => [initial, () => {}], useEffect() {}, useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot() };
 const timer = {};
 new Function('exports', 'require', await jsx('../app/game-timer.tsx'))(timer, (name) => name === 'react' ? react : name === './display-preferences' ? { useDisplayTimestamp: () => require('../lib/display-preferences.ts').displayTimestamp } : name === '../lib/game-time' ? require('../lib/game-time.ts') : name.endsWith('.css') ? { timer: 'timer', compact: 'compact' } : require(name));
 const shell = {}, blank = () => null;

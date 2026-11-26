@@ -1,4 +1,5 @@
 /** #1445 slice 4. NEXT_PUBLIC_HARIMU_PLACE_NAV is HARIMU_UI_PACK index 75. Only "true" enables it. */
+import { cityForNation, residentCitiesForNation } from './cities.ts';
 import { desktopGateEnabled } from './desktop-gate.ts';
 import { isDistrictSlot, neighborhoodWalkEnabled } from './neighborhood-walk.ts';
 export const PLACE_NAV_FLAG = 'NEXT_PUBLIC_HARIMU_PLACE_NAV';
@@ -25,6 +26,21 @@ export function noteDistrictSlots(cityId: string | null | undefined, slots: numb
 export function keepDistrict(params: URLSearchParams, district: string): boolean {
   if (!neighborhoodWalkEnabled() || params.get('view') !== 'neighborhood' || !isDistrictSlot(district)) return false; if (!placeNavEnabled() || !noted) return true;
   const city = params.get('city'); return noted.city && city && noted.city !== city ? true : Number(district) < noted.slots;
+}
+const doorY = 0.46, wallHalf = { x: 0.85, z: 0.75 }, doorOut = { x: 0.88, z: 0.78 };
+/** The walk door sits on the axis-aligned wall nearest the square (the origin). A tie keeps the z face, which is the old +z door. */
+export function houseDoorPose(house: { x: number; z: number }): { x: number; y: number; z: number; rotationY: number } {
+  const y = doorY, sx = house.x > 0 ? -1 : 1, sz = house.z > 0 ? -1 : 1;
+  const xFace = (house.x + sx * wallHalf.x) ** 2 + house.z ** 2, zFace = house.x ** 2 + (house.z + sz * wallHalf.z) ** 2;
+  return xFace < zFace ? { x: house.x + sx * doorOut.x, y, z: house.z, rotationY: Math.PI / 2 } : { x: house.x, y, z: house.z + sz * doorOut.z, rotationY: 0 };
+}
+/** Crumb targets while place nav is shown. `district` is the URL slot `keepDistrict` still accepts. `cityId` is the URL city in this nation, else the resident city with this name. A held nation passes neither. */
+export function placeCrumbTargets(search: string, nationId: string, cityName?: string, held = false): { cityId?: string; district?: string } {
+  if (held) return {};
+  let params: URLSearchParams; try { params = new URLSearchParams(search); } catch { return {}; }
+  const rawCity = params.get('city') ?? '', cityId = cityForNation(nationId, rawCity)?.id ?? (cityName ? residentCitiesForNation(nationId).find(city => city.name === cityName)?.id : undefined);
+  const district = params.get('district') ?? '';
+  return { ...(cityId ? { cityId } : {}), ...(district && keepDistrict(params, district) ? { district } : {}) };
 }
 /** Flag off leaves a neighborhood district untouched. Flag on sets one, and drops a carried one across a nation or city (#55). */
 export function applyDistrict(url: URL, scene: string, nationId: string | undefined, prevNation: string | null, prevCity: string | null, cityId: string | undefined, district: string | null): void {
