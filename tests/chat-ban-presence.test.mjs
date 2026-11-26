@@ -9,16 +9,14 @@ import { chatBanActiveIds } from '../lib/chat-ban.ts';
 
 const iso = seconds => new Date(seconds * 1000).toISOString().replace('.000Z', 'Z');
 
-test('#1517 chatBanActiveIds: in-window ids only; empty when the var is unset, empty or the window has ended', () => {
+test('#1517 chatBanActiveIds: in-window ids only; empty when the var is unset, empty, malformed or the window has ended', () => {
   const start = 1_783_000_000, end = start + 3600;
   const raw = `alice@${iso(start)}..${iso(end)},bob@${iso(start)}..${iso(end)}`;
   assert.deepEqual(chatBanActiveIds(raw, start).sort(), ['alice', 'bob']);
   assert.deepEqual(chatBanActiveIds(raw, end), []);
-  for (const value of [undefined, '', `alice@${iso(start)}..${iso(end)}`]) {
-    assert.deepEqual(chatBanActiveIds(value, start).filter(id => id === 'carol'), []);
-  }
   assert.deepEqual(chatBanActiveIds(undefined, start), []);
   assert.deepEqual(chatBanActiveIds('', start), []);
+  assert.deepEqual(chatBanActiveIds('not-a-ban', start), []);
   assert.deepEqual(chatBanActiveIds(`alice@${iso(start)}..${iso(end)}`, start - 1), []);
 });
 
@@ -37,9 +35,22 @@ for (const backend of ['sqlite', 'postgres']) {
       r.setFixtureEnv('HARIMU_CHAT_BAN', value);
       const res = await share('alice');
       assert.equal(res.status, 200, JSON.stringify(res.data));
-      assert.ok(await row('alice'), `share works when var is ${String(value)}`);
+      const held = await row('alice');
+      assert.ok(held, `share works when var is ${String(value)}`);
+      const anon = await r.call('square', null);
+      assert.equal(anon.status, 401, 'unauthenticated GET is 401');
+      assert.deepEqual(anon.data, { error: 'Sign in required.' });
+      assert.equal((await row('alice'))?.expires_at, held.expires_at, 'unauthenticated GET does not write presence');
+      assert.equal((await r.call('square', 'bob')).status, 200);
+      assert.equal((await row('alice'))?.expires_at, held.expires_at, `GET leaves existing rows when var is ${String(value)}`);
+      const peer = await share('bob');
+      assert.equal(peer.status, 200, JSON.stringify(peer.data));
+      assert.equal((await row('alice'))?.expires_at, held.expires_at, `another citizen's POST leaves existing rows when var is ${String(value)}`);
+      assert.ok(await row('bob'));
       assert.equal((await clear('alice')).status, 200);
+      assert.equal((await clear('bob')).status, 200);
       assert.equal(await row('alice'), null);
+      assert.equal(await row('bob'), null);
     }
 
     assert.equal((await share('alice')).status, 200);
@@ -83,7 +94,7 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-test('#1517 presence mutants: dropping the share gate or the presence clear, inverting the gate, or returning 200 instead of 403 fails the SQLite tests', { timeout: 600_000 }, () => {
+test('#1517 presence mutants: dropping the share gate or the presence clear, wiping all rows when the var is unset or empty, inverting the gate, or returning 200 instead of 403 fails the SQLite tests', { timeout: 600_000 }, () => {
   const cases = [
     { file: 'app/api/square/route.ts', find: "if(body.active){const banned=chatBanRefusal((env as unknown as {HARIMU_CHAT_BAN?:string}).HARIMU_CHAT_BAN,userId,now,'square-presence');if(banned)return privateResponse(banned,403);}", replace: '' },
     { file: 'app/api/square/route.ts', find: "if(body.active){const banned=chatBanRefusal", replace: "if(!body.active){const banned=chatBanRefusal" },
@@ -91,6 +102,7 @@ test('#1517 presence mutants: dropping the share gate or the presence clear, inv
     { file: 'app/api/square/route.ts', find: '  await clearBannedPresence(ctx.db,ctx.now);\n  return privateResponse', replace: '  return privateResponse' },
     { file: 'app/api/square/route.ts', find: '  await clearBannedPresence(ctx.db,ctx.now);\n  let body', replace: '  let body' },
     { file: 'lib/chat-ban.ts', find: 'return [...bans.keys()].filter(id => chatBanUntil(bans, id, now) !== null);', replace: 'return [];' },
+    { file: 'app/api/square/route.ts', find: 'if(!ids.length)return;', replace: "if(!ids.length){await db.prepare('DELETE FROM square_presence').run();return;}" },
   ];
   const tree = mutantTree();
   try {
