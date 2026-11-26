@@ -128,10 +128,12 @@ for (const backend of ['sqlite', 'postgres']) {
       setLossFlags(r);
       const { epoch } = await previewTick(r);
       const crown = await r.importModule('lib/crown-debasement.ts');
-      for (let i = 0; i < 4; i++) await insertAurelleLoss(r, { id: `cap${i}`, at: epoch + 1 + i });
-      assert.equal((await crown.readCrownMint(r.db, epoch + 20, { warLoss: true })).currencyConfidence, 70);
+      await insertAurelleLoss(r, { id: 'in-window', at: epoch + 1 });
       await insertAurelleLoss(r, { id: 'future', at: epoch + 50 });
-      assert.equal((await crown.readCrownMint(r.db, epoch + 20, { warLoss: true })).currencyConfidence, 70, 'a loss decided after the as-of time does not count');
+      assert.equal((await crown.readCrownMint(r.db, epoch + 20, { warLoss: true })).currencyConfidence, 90, 'a loss decided after the as-of time does not count');
+      assert.equal((await crown.readCrownMint(r.db, epoch + 50, { warLoss: true })).currencyConfidence, 80);
+      for (let i = 0; i < 3; i++) await insertAurelleLoss(r, { id: `cap${i}`, at: epoch + 2 + i });
+      assert.equal((await crown.readCrownMint(r.db, epoch + 20, { warLoss: true })).currencyConfidence, 70, 'four in-window losses cap the term at −30');
       assert.equal((await crown.readCrownMint(r.db, epoch + 50, { warLoss: true })).currencyConfidence, 70, 'a fifth loss is still capped at −30');
     } finally { await r.close(); }
   });
