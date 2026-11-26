@@ -1,4 +1,6 @@
 import type {GameDatabase} from './database-contract';
+import { embargoStabilityDetail, embargoStabilityPoints } from './embargo-stability-rules.ts'; // #1526
+import type { EmbargoStabilityMap } from './embargo-stability.ts'; // #1526
 /** Mirrors world-simulation tickSeconds (one game day); duplicated to avoid an import cycle. */
 export const tickSeconds = 7200;
 
@@ -36,8 +38,11 @@ export type StabilityInputs = {
  rationRecovery?: number;
  /** #1506: Aurelle Crown Currency Confidence (0–100) as of the tick, only while HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED and HARIMU_CROWN_DEBASEMENT_ENABLED are on. Absent otherwise, so flag-off inputs_json is unchanged. */
  crownConfidence?: number;
+ /** #1526: in-force embargo counts as of the tick, only while HARIMU_EMBARGO_STABILITY_ENABLED and HARIMU_EMBARGO_ENABLED are on. Absent when zero, so flag-off inputs_json is unchanged. */
+ embargoesAgainstUs?: number;
+ embargoesWeImpose?: number;
 };
-export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony'|'ration'|'rationRecovery'|'currency';
+export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony'|'ration'|'rationRecovery'|'currency'|'embargo';
 export type ScoreTerm = {input: StabilityInputId; points: number; detail: string};
 export type StabilityScore = {stability: number; unrest: number; breakdown: {stability: ScoreTerm[]; unrest: ScoreTerm[]}};
 export type StabilityRecord = StabilityScore & {nationId: StabilityNation; tick: number; scheduledAt: number; inputs: StabilityInputs};
@@ -119,6 +124,11 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
  if (raw.crownConfidence !== undefined) { const n = Math.max(0, Math.min(100, Math.round(Number(raw.crownConfidence) || 0))), base = stability.reduce((t, x) => t+x.points, 0);
   const pts = Math.max(-base, Math.min(100-base, crownConfidenceStabilityPoints(n)));
   stability.push({input:'currency',points:pts,detail:`Crown Currency Confidence ${n}/100`}); }
+ // #1526 [ASSUMPTION, ARC on #1526, citing docs §13.3]: an in-force embargo costs the target −4 and the sanctioner −1, combined term capped at −8, Stability only. The term appears only when the (fitted) points are non-zero.
+ { const counts = { embargoesAgainstUs: raw.embargoesAgainstUs, embargoesWeImpose: raw.embargoesWeImpose };
+  const rawPts = embargoStabilityPoints(counts);
+  if (rawPts !== 0) { const base = stability.reduce((t, x) => t+x.points, 0), pts = Math.max(-base, Math.min(0, rawPts));
+   if (pts !== 0) stability.push({input:'embargo',points:pts,detail:embargoStabilityDetail(counts)}); } }
  const unrest: ScoreTerm[] = [
   {input:'baseline',points:unrestBaseline,detail:'Baseline'},
   {input:'food',points:food.unrest,detail:foodDetail},{input:'work',points:work.unrest,detail:workDetail},
@@ -159,8 +169,8 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>; rationCuts?: number; rationRecovery?: number; crownConfidence?: number} = {}) {
- return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); if (nationId === 'korund' && options.rationCuts) inputs.rationCuts = options.rationCuts; if (nationId === 'korund' && options.rationRecovery) inputs.rationRecovery = options.rationRecovery; if (nationId === 'aurelle' && options.crownConfidence !== undefined) inputs.crownConfidence = options.crownConfidence; const score = computeStability(inputs);
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>; rationCuts?: number; rationRecovery?: number; crownConfidence?: number; embargo?: EmbargoStabilityMap | null} = {}) {
+ return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); if (nationId === 'korund' && options.rationCuts) inputs.rationCuts = options.rationCuts; if (nationId === 'korund' && options.rationRecovery) inputs.rationRecovery = options.rationRecovery; if (nationId === 'aurelle' && options.crownConfidence !== undefined) inputs.crownConfidence = options.crownConfidence; const embargo = options.embargo?.[nationId]; if (embargo && (embargo.embargoesAgainstUs > 0 || embargo.embargoesWeImpose > 0)) { inputs.embargoesAgainstUs = embargo.embargoesAgainstUs; inputs.embargoesWeImpose = embargo.embargoesWeImpose; } const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));
 }

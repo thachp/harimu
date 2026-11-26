@@ -52,6 +52,7 @@ for (const backend of backends) {
     const id = await postCong('bob', hall);
     const res = await report('alice', { targetId: id });
     assert.equal(res.status, 201, 'a current congregation member can report another member\'s live congregation message');
+    assert.deepStrictEqual(res.data, { ok: true });
     assert.deepEqual(await rows(r.db), [{ reporter_id: 'alice', target_kind: 'citizen-message', target_id: id, reason_id: 'spam-other' }]);
   }));
 
@@ -98,6 +99,13 @@ for (const backend of backends) {
     assert.deepEqual(await rows(r.db), []);
   }));
 
+  test(`#1523 (${backend}): an unknown message id is 404`, quiet(async t => {
+    const { joinParty, joinCong, report } = await setup(t, backend);
+    await joinParty('alice', 'open-ledger');
+    await joinCong('alice', 'kinward-rite:forgehaven');
+    assert.equal((await report('alice', { targetId: randomUUID() })).status, 404, 'an unknown message id is 404');
+  }));
+
   test(`#1523 (${backend}): a second report of the same party message is a duplicate; a replay of the same request id is a no-op; an eleventh report in the day is refused`, quiet(async t => {
     const { r, joinParty, postParty, report } = await setup(t, backend);
     await joinParty('alice', 'dockside-builders'); await joinParty('bob', 'dockside-builders');
@@ -136,6 +144,8 @@ test('#1523 mutations: dropping a membership, own-message, deleted, channel-flag
       { find: "if(replay)return same(replay)?{status:201,body:{ok:true}}:err(409,'Request already used.');\n return err(409,'You already reported this.',{duplicate:true});", replace: "if(replay)return same(replay)?{status:201,body:{ok:true}}:err(409,'Request already used.');\n return {status:201,body:{ok:true}};" },
     ], pattern: "a second report of the same party message is a duplicate" },
     { find: "if(!(await db.prepare(takeSlotSql).bind(userId,day,reportDailyLimit).run()).meta.changes)return err(429,`You can send up to ${reportDailyLimit} reports a day.`);", replace: "if(false)return err(429,`You can send up to ${reportDailyLimit} reports a day.`);", pattern: "an eleventh report in the day is refused" },
+    { find: "if(result.meta.changes)return {status:201,body:{ok:true}};", replace: "if(result.meta.changes)return {status:201,body:{ok:true,reporterId:userId}};", pattern: "a current congregation member can report" },
+    { find: "else if(!await targetVisible(db,userId,nationId,kind,target,now))return err(404,'That item is not available to report.');", replace: "else if(false)return err(404,'That item is not available to report.');", pattern: "an unknown message id is 404" },
   ];
   // Patterns for membership-only mutants must appear in the 404 test names.
   process.env.HARIMU_MUTANT_BACKENDS = 'sqlite';

@@ -6,7 +6,7 @@ import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
 import { latchAfterWrite } from '@/lib/first-week-server';
 import { parseShadowMute, logShadowMuted, isShadowMuted } from '@/lib/chat-shadow-mute';
-import { chatBanRefusal } from '@/lib/chat-ban';
+import { chatBanRefusal, chatBanActiveIds } from '@/lib/chat-ban';
 // #790: operator shadow-mute list (comma-separated citizenId@ISO8601 entries, not a secret; new posts only). Empty: no change.
 const shadowMuted=()=>parseShadowMute((env as unknown as {HARIMU_CHAT_SHADOW_MUTE?:string}).HARIMU_CHAT_SHADOW_MUTE);
 export const dynamic='force-dynamic';
@@ -20,10 +20,18 @@ async function context(request:Request) {
   return {db,userId,nationId:profile?.nation_id??null,now:Math.floor(Date.now()/1000)};
 }
 const privateResponse=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
+const chatBanRaw=()=>(env as unknown as {HARIMU_CHAT_BAN?:string}).HARIMU_CHAT_BAN;
+// #1517 follow-up to #1529: drop current square_presence rows for every in-window ban so they do not linger until expires_at.
+async function clearBannedPresence(db:Awaited<ReturnType<typeof getDatabase>>,now:number){
+  const ids=chatBanActiveIds(chatBanRaw(),now);
+  if(!ids.length)return;
+  await db.prepare(`DELETE FROM square_presence WHERE user_id IN (${ids.map(()=>'?').join(',')})`).bind(...ids).run();
+}
 export async function GET(request:Request) {
   const ctx=await context(request);
   if(!ctx)return privateResponse({error:'Sign in required.'},401);
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
+  await clearBannedPresence(ctx.db,ctx.now);
   return privateResponse({...await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now,shadowMuted()),reportsEnabled:reportsEnabled()});
 }
 // #194: a square post can complete a first-week goal; latch after a successful write.
@@ -38,6 +46,7 @@ async function handleSquarePost(request:Request) {
   const ctx=await context(request);
   if(!ctx)return privateResponse({error:'Sign in required.'},401);
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
+  await clearBannedPresence(ctx.db,ctx.now);
   let body: Record<string,unknown>;
   try { const reader=request.body?.getReader();if(!reader)throw Error();const chunks:Uint8Array[]=[];let size=0;for(;;){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>4096){await reader.cancel();throw Error();}chunks.push(part.value);}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const raw=new TextDecoder().decode(bytes);const parsed=JSON.parse(raw);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error();body=parsed; }catch{return privateResponse({error:'Invalid request.'},400);}
   const {db,userId,nationId,now}=ctx;const muted=shadowMuted();
