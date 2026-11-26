@@ -6,6 +6,7 @@ import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
 import { latchAfterWrite } from '@/lib/first-week-server';
 import { parseShadowMute, logShadowMuted, isShadowMuted } from '@/lib/chat-shadow-mute';
+import { chatBanRefusal } from '@/lib/chat-ban';
 // #790: operator shadow-mute list (comma-separated citizenId@ISO8601 entries, not a secret; new posts only). Empty: no change.
 const shadowMuted=()=>parseShadowMute((env as unknown as {HARIMU_CHAT_SHADOW_MUTE?:string}).HARIMU_CHAT_SHADOW_MUTE);
 export const dynamic='force-dynamic';
@@ -57,6 +58,7 @@ async function handleSquarePost(request:Request) {
   } else if(body.action==='post') {
     if(typeof body.id!=='string'||!uuidPattern.test(body.id)||!validSquareText(body.text))return privateResponse({error:'Use 1–280 plain-text characters and a valid request ID.'},400);
     const id=body.id.toLowerCase();const text=body.text.trim();
+    const banned=chatBanRefusal((env as unknown as {HARIMU_CHAT_BAN?:string}).HARIMU_CHAT_BAN,userId,now,'square');if(banned)return privateResponse(banned,403); // #1517
     const existing=await db.prepare('SELECT user_id,body,deleted,nation_id FROM square_messages WHERE id=?').bind(id).first<{user_id:string;body:string;deleted:number;nation_id:string}>();
     if(existing) {
       if(existing.user_id!==userId||existing.nation_id!==nationId||existing.body!==text||existing.deleted)return privateResponse({error:'Request already used.'},409);

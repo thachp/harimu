@@ -4,6 +4,7 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
+import { chatBanRefusal } from '@/lib/chat-ban';
 import { congregationCatalog, currentCongregation } from '@/lib/congregations';
 import { congregationChatFlagOn, postCongregationChatBinds, postCongregationChatSql, readCongregationChat } from '@/lib/congregation-chat';
 
@@ -11,7 +12,7 @@ import { congregationChatFlagOn, postCongregationChatBinds, postCongregationChat
 export const dynamic = 'force-dynamic';
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const vars = () => env as unknown as { HARIMU_CHAT_SHADOW_MUTE?: string };
+const vars = () => env as unknown as { HARIMU_CHAT_BAN?: string; HARIMU_CHAT_SHADOW_MUTE?: string };
 const now = () => Math.floor(Date.now() / 1000);
 const notFound = () => json({ error: 'Not found.', reason: 'not_found' }, 404);
 async function citizen(request: Request) {
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
   const text = body.text.trim();
   type Prior = { user_id: string; body: string; congregation_id: string; deleted: number };
   const same = (row: Prior | null) => row && row.user_id === userId && row.body === text && row.congregation_id === congregationId && !row.deleted;
+  const banned = chatBanRefusal(vars().HARIMU_CHAT_BAN, userId, t, 'congregation'); if (banned) return json(banned, 403); // #1517
   const prior = await db.prepare('SELECT user_id,body,congregation_id,deleted FROM congregation_messages WHERE id=?').bind(id).first<Prior>();
   if (prior) return same(prior) ? view(db, userId, congregationId, t) : json({ error: 'Request already used.' }, 409);
   await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId, `Citizen-${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`).run();
