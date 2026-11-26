@@ -8,17 +8,23 @@ export const dmChatSchemas = [
   `CREATE TABLE IF NOT EXISTS dm_chat_messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, sender_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), peer_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), body TEXT NOT NULL CHECK(length(body) BETWEEN 1 AND 280), posted_at INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS dm_chat_messages_feed ON dm_chat_messages(conversation_id, posted_at)`,
   `CREATE INDEX IF NOT EXISTS dm_chat_messages_rate ON dm_chat_messages(sender_id, posted_at)`,
+  `CREATE TABLE IF NOT EXISTS dm_blocks (blocker_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), blocked_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), blocked_at INTEGER NOT NULL, PRIMARY KEY(blocker_id, blocked_id), CHECK(blocker_id <> blocked_id))`, // #1516 (migration 0136)
+  `CREATE INDEX IF NOT EXISTS dm_blocks_blocked ON dm_blocks(blocked_id)`,
 ];
 export const dmChatFlagOn = (b: unknown) => (b as { HARIMU_DM_CHAT_ENABLED?: string })?.HARIMU_DM_CHAT_ENABLED === 'true';
+/** #1516: player-to-player DM block rides the DM flag (ARC reserved no separate flag); the one place to swap in a dedicated flag. */
+export const dmBlockOn = dmChatFlagOn;
+export const dmBlockCopy = { block: 'Block', unblock: 'Unblock', refusal: "You can't message this citizen." } as const;
 export const dmChatRetentionSeconds = 604800, dmChatGapSeconds = 10, dmChatHourlyLimit = 20, dmChatPageSize = 50;
 /** Stable thread key for a pair (order-independent). */
 export const dmConversationId = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** Inserts only when both citizens are enrolled; nation is never taken from the client. 0 changes: replay, limit, self, or unenrolled peer. */
+/** Inserts only when both citizens are enrolled; nation is never taken from the client. 0 changes: replay, limit, self, unenrolled peer, or a #1516 block either way. */
 export const postDmChatSql = `INSERT INTO dm_chat_messages(id,conversation_id,sender_id,peer_id,body,posted_at)
 SELECT ?, ?, s.clerk_user_id, p.clerk_user_id, ?, ? FROM citizens s JOIN citizens p ON p.clerk_user_id=? AND p.nation_id IS NOT NULL
 WHERE s.clerk_user_id=? AND s.nation_id IS NOT NULL AND s.clerk_user_id<>p.clerk_user_id
 AND NOT EXISTS (SELECT 1 FROM dm_chat_messages WHERE id=?)
+AND NOT EXISTS (SELECT 1 FROM dm_blocks WHERE (blocker_id=s.clerk_user_id AND blocked_id=p.clerk_user_id) OR (blocker_id=p.clerk_user_id AND blocked_id=s.clerk_user_id))
 AND NOT EXISTS (SELECT 1 FROM dm_chat_messages WHERE sender_id=? AND posted_at>?)
 AND (SELECT COUNT(*) FROM dm_chat_messages WHERE sender_id=? AND posted_at>?)<${dmChatHourlyLimit}`;
 export const postDmChatBinds = (id: string, conversationId: string, text: string, now: number, userId: string, peerId: string) =>
@@ -35,4 +41,13 @@ export async function readDmChat(db: GameDatabase, userId: string, peerId: strin
     ORDER BY m.posted_at DESC,m.id DESC LIMIT 200`).bind(conversationId, now - dmChatRetentionSeconds, userId).all<Row>()).results
     .filter(row => row.sender_id === userId || !isShadowMuted(muted, row.sender_id, Number(row.posted_at))).slice(0, dmChatPageSize).reverse();
   return { peerId, messages: rows.map((row): DmChatMessage => ({ id: row.id, handle: row.handle, body: row.body, postedAt: Number(row.posted_at), mine: row.sender_id === userId })) };
+}
+
+/** #1516: idempotent block (enrolled peer only; 0 changes when already blocked or peer unavailable) and unblock (own row only). */
+export const blockDmSql = `INSERT INTO dm_blocks(blocker_id,blocked_id,blocked_at) SELECT ?, p.clerk_user_id, ? FROM citizens p
+WHERE p.clerk_user_id=? AND p.nation_id IS NOT NULL AND p.clerk_user_id<>? ON CONFLICT DO NOTHING`;
+export const unblockDmSql = 'DELETE FROM dm_blocks WHERE blocker_id=? AND blocked_id=?';
+export const dmBlockedEitherWaySql = 'SELECT 1 AS ok FROM dm_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)';
+export async function dmBlockedByMe(db: GameDatabase, userId: string, peerId: string) {
+  return Boolean(await db.prepare('SELECT 1 AS ok FROM dm_blocks WHERE blocker_id=? AND blocked_id=?').bind(userId, peerId).first());
 }
