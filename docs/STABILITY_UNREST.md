@@ -21,6 +21,8 @@ Scores are deterministic rules over records the game already keeps. Exact weight
 
 - **War weariness (#423, only while `HARIMU_WAR_ENABLED` and `HARIMU_WAR_WEARINESS_ENABLED` are on):** each full game week a nation's war has been active adds Unrest (more in Kindle, less in Korund). The `war` term appears in the Unrest breakdown only while a war adds something, and it is clamped to what is left under 100 (the other Unrest terms can already reach 100). Nothing is stored for it beyond the daily score: it is derived from the `wars` table at the tick's time. With `HARIMU_WAR_WEARINESS_LOSSES_ENABLED` also on (#495), the frontier squares a nation has lost to city captures in its active wars (`city_captures.squares_transferred`) during the rolling game week before the tick add capped Unrest too, netted against the squares that nation truly recaptured in the same week (squares an earlier capture had taken from it, per `city_capture_squares.from_nation`), floored at 0 (squares a holder privately kept are not lost) add capped Unrest too. Casualties still read zero because nothing records them. Numbers are [ASSUMPTION]s in `lib/war-rules.ts`.
 
+- **Currency Confidence (#1506, only while `HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED` and `HARIMU_CROWN_DEBASEMENT_ENABLED` are on):** docs §10.1 lists Currency Confidence among the daily Stability inputs; §12.4 says Currency Confidence (0–100) "feeds Stability". Aurelle only; no Unrest term. The Stability step reuses the stored `crown_decrees.confidence_after` as of the tick's `scheduled_at` (latest decree with `decreed_at` at or before that instant; baseline 100 when there is no such decree). [ASSUMPTION, ARC on #1506]: 0 Stability points at Confidence ≥ 90, then −1 per 5 below 90, capped at −10; the term never raises Stability. The `currency` term appears in the breakdown whenever the input is present (including a 0-point term at baseline 100). A missing `crown_decrees` table adds no term. Flag off: inputs and breakdown are unchanged and `crown_decrees` is not read.
+
 Each factor has a bounded contribution, so both scores always stay within 0–100 without clamping, and **the stored breakdown always sums exactly to the score**.
 
 ## Storage
@@ -60,7 +62,7 @@ computeStability(inputs): {stability, unrest, breakdown}   // pure
 
 ## Out of scope
 
-Grievance/repression, war score, inequality, Currency Confidence, Religious Harmony, Unrest events and Crisis. Add new inputs as extra `ScoreTerm`s, keeping the ranges so the sum stays within 0..100.
+Grievance/repression, war score, inequality, Unrest events and Crisis. Add new inputs as extra `ScoreTerm`s, keeping the ranges so the sum stays within 0..100.
 
 - **Catch-up reads that day's records (#142).** Every input is windowed on the tick's scheduled time, including petition backlog: a petition resolved after that time still counts as backlog for the earlier tick.
 

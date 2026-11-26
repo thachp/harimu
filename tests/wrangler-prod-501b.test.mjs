@@ -185,6 +185,7 @@ const previewOnFlags = [
   'HARIMU_NAP_REPUTATION_GATE_ENABLED', // #1495 packed in HARIMU_GRAY_PACK (GRAY 99, index 97, after trade renewal). Needs HARIMU_DIPLOMACY_ENABLED.
   'HARIMU_BATTLE_TERRAIN_ENABLED', // #1491 packed in HARIMU_GRAY_PACK, after the NAP gate (index 98, GRAY 98)
   'HARIMU_REPUTATION_DEBASEMENT_ENABLED', // #1496 packed in HARIMU_GRAY_PACK, after battle terrain (index 99, GRAY 100)
+  'HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED', // #1506 packed in HARIMU_GRAY_PACK, after reputation debasement (index 100). indexOf only; pack length is not pinned.
   'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED', // #1134 packed in HARIMU_GRAY_PACK
   'HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED', // #1469 packed in HARIMU_GRAY_PACK (index 94, GRAY 95)
   'HARIMU_DIPLOMACY_ENABLED',
