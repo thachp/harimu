@@ -4,12 +4,13 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
+import { chatBanRefusal } from '@/lib/chat-ban';
 import { dmChatFlagOn, dmConversationId, postDmChatBinds, postDmChatSql, readDmChat } from '@/lib/dm-chat';
 
 // #881 part 3: DMs. Flag HARIMU_DM_CHAT_ENABLED off: 404 before auth or any DB access.
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const vars = () => env as unknown as { HARIMU_CHAT_SHADOW_MUTE?: string; HARIMU_REPORTS_ENABLED?: string };
+const vars = () => env as unknown as { HARIMU_CHAT_BAN?: string; HARIMU_CHAT_SHADOW_MUTE?: string; HARIMU_REPORTS_ENABLED?: string };
 const now = () => Math.floor(Date.now() / 1000);
 async function citizen(request: Request) {
   const userId = await authenticatedUserId(request);
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
   const text = body.text.trim(), conversationId = dmConversationId(userId, peerId);
   type Prior = { sender_id: string; body: string; deleted: number };
   const same = (row: Prior | null) => row && row.sender_id === userId && row.body === text && !row.deleted;
+  const banned = chatBanRefusal(vars().HARIMU_CHAT_BAN, userId, t, 'dm'); if (banned) return json(banned, 403); // #1517
   const prior = await db.prepare('SELECT sender_id,body,deleted FROM dm_chat_messages WHERE id=?').bind(id).first<Prior>();
   if (prior) return same(prior) ? view(db, userId, peerId, t) : json({ error: 'Request already used.' }, 409);
   await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId, `Citizen-${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`).run();

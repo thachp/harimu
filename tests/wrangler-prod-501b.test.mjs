@@ -13,7 +13,7 @@ import { expandFlagPacks, flagPackProblems, isFlagPackName } from '../lib/flag-p
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
-const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_KINDLE_CYCLE_START_AT']; // #501c; #878: the cycle start is preview-only (unset in production: calendars held): no journal in production
+const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_KINDLE_CYCLE_START_AT', 'HARIMU_CHAT_BAN']; // #501c; #878: the cycle start is preview-only (unset in production: calendars held): no journal in production; #1517: chat bans are preview-only until ARC/Patrick add them to production (unset: bans nobody)
 // Top-level keys present in preview and deliberately absent in production (preview-only observability, Patrick approved via PM).
 const previewOnlyTopLevelKeys = ['d1_databases', 'observability'];
 // Vars production adds, with their required values.
@@ -186,6 +186,7 @@ const previewOnFlags = [
   'HARIMU_BATTLE_TERRAIN_ENABLED', // #1491 packed in HARIMU_GRAY_PACK, after the NAP gate (index 98, GRAY 98)
   'HARIMU_REPUTATION_DEBASEMENT_ENABLED', // #1496 packed in HARIMU_GRAY_PACK, after battle terrain (index 99, GRAY 100)
   'HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED', // #1506 packed in HARIMU_GRAY_PACK, after reputation debasement (index 100). indexOf only; pack length is not pinned.
+  'HARIMU_TREATY_BREAK_ENABLED', // #1507 packed in HARIMU_GRAY_PACK (GRAY 102; index 101 today, after Crown Confidence to Stability). Needs HARIMU_DIPLOMACY_ENABLED.
   'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED', // #1134 packed in HARIMU_GRAY_PACK
   'HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED', // #1469 packed in HARIMU_GRAY_PACK (index 94, GRAY 95)
   'HARIMU_DIPLOMACY_ENABLED',

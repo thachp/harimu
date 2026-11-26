@@ -230,8 +230,8 @@ test('#1495 mutations: floor off-by-one, own score, trade gating, the LIMIT 20 l
     },
     {
       file: 'lib/world-simulation.ts',
-      find: 'runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, \'HARIMU_TRADE_RENEWAL_ENABLED\'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true, debasement: flagOn(options.atlasEnv, \'HARIMU_REPUTATION_DEBASEMENT_ENABLED\') })',
-      replace: 'runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, \'HARIMU_TRADE_RENEWAL_ENABLED\'), embargo: options.embargo === true, napReputationGate: true, debasement: flagOn(options.atlasEnv, \'HARIMU_REPUTATION_DEBASEMENT_ENABLED\') })',
+      find: 'runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, \'HARIMU_TRADE_RENEWAL_ENABLED\'), treatyBreak: flagOn(options.atlasEnv, \'HARIMU_TREATY_BREAK_ENABLED\'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true, debasement: flagOn(options.atlasEnv, \'HARIMU_REPUTATION_DEBASEMENT_ENABLED\') })',
+      replace: 'runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, \'HARIMU_TRADE_RENEWAL_ENABLED\'), treatyBreak: flagOn(options.atlasEnv, \'HARIMU_TREATY_BREAK_ENABLED\'), embargo: options.embargo === true, napReputationGate: true, debasement: flagOn(options.atlasEnv, \'HARIMU_REPUTATION_DEBASEMENT_ENABLED\') })',
       pattern: 'flag off ratifies the same Kindle–Korund fixture',
     },
   ];
