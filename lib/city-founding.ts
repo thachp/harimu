@@ -1,6 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { flagOn } from './flag-pack.mjs';
 import { mapHeight, mapWidth, onGrid, mvpNations, type Zone } from './map-zones';
+import { borderIncidentsEnabled, borderIncidentStatements, borderIncidentTableReady, borderIncidentTargets } from './border-incidents'; // #1527
 
 /**
  * Found a T1 city on Wildlands (#124, docs 15.1 Founding). PoC: one flag-gated stub action per MVP nation.
@@ -112,6 +113,9 @@ export async function foundCity(db: GameDatabase, userId: string, nationId: stri
   // Guarded writes in one batch (one transaction on D1 and Postgres): the city row is inserted only if the
   // whole block is still unowned Wildlands and no settlement is within range; squares change only if that row exists.
   // Flag on: the same INSERT also requires the expedition headcount. Flag off: this statement is unchanged.
+  // #1527 flag on: one incident per nation touching the claimed block (x, y = the centre), written only if the city row is. Flag off or no table yet: the batch is unchanged.
+  const incidents = borderIncidentsEnabled(env) && await borderIncidentTableReady(db) ? borderIncidentStatements(db, { kind: 'city_founding', requestId: command.requestId, actor: nation, x, y, at: now, radius: r + 1,
+    targets: borderIncidentTargets(squares, nation, squares.filter(s => cheb(s, { x, y }) <= r)), action: { sql: 'SELECT 1 FROM world_cities WHERE id=? AND request_id=?', binds: [id, command.requestId] } }) : [];
   const headcount = expedition ? ` AND (SELECT COUNT(*) FROM citizens WHERE nation_id=?)>=${expeditionMinCitizens}` : '';
   await db.batch([
     db.prepare(`INSERT INTO world_cities (id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at)
@@ -124,6 +128,7 @@ export async function foundCity(db: GameDatabase, userId: string, nationId: stri
     db.prepare(`UPDATE world_squares SET owner=?, zone='frontier', feature=CASE WHEN x=? AND y=? THEN 'city' ELSE feature END
       WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND EXISTS (SELECT 1 FROM world_cities WHERE id=? AND request_id=?)`)
       .bind(nation, x, y, x - r, x + r, y - r, y + r, id, command.requestId),
+    ...incidents,
   ]);
   const created = await db.prepare('SELECT id FROM world_cities WHERE request_id=?').bind(command.requestId).first<{ id: string }>();
   if (!created) {

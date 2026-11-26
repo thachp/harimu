@@ -3,6 +3,7 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { pendingRevertStatement, revertPeaceCaptures } from './war-peace-revert'; // #1054
 import { activeNonAggressionPact } from './diplomacy'; // #402
+import { borderIncidentCount, borderIncidentsEnabled } from './border-incidents'; // #1527
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
 import { kindleOutgoingPresidentIsCaretaker } from './kindle-caretaker';
 import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
@@ -117,15 +118,17 @@ async function pactInForce(check: NonNullable<DeclareWarOptions['nonAggression']
 }
 
 /** #426: the grievance inputs the stores can answer today, read-only. A database without a table reads as 0 for that input (fail closed: nothing invented).
- *  Border incidents and Commons disputes have no store yet, so they are always 0 / false. A pact or trade treaty counts when the TARGET broke it (treaties.broken_by);
+ *  #1527: border incidents count only with HARIMU_BORDER_INCIDENTS_ENABLED on (off: no read, 0): the defender's incidents against the attacker in the last 30 real days.
+ *  Commons disputes have no store yet, so they are always false. A pact or trade treaty counts when the TARGET broke it (treaties.broken_by);
  *  an embargo counts while the target's embargo against the attacker is in force. [ASSUMPTION] Broken treaties carry no age limit (ARC gave a window only for border incidents).
  *  The ruling's "(or vice-versa while we still hold a grievance)" for the pact is not scored: it is ambiguous, so only the target's break counts (question on the PR). */
-export async function readGrievanceInputs(db: GameDatabase, attacker: WarNationId, defender: WarNationId): Promise<GrievanceInputs> {
+export async function readGrievanceInputs(db: GameDatabase, attacker: WarNationId, defender: WarNationId, now = Math.floor(Date.now() / 1000), incidents = borderIncidentsEnabled(env)): Promise<GrievanceInputs> {
   const broken = async (kind: 'non-aggression' | 'trade') => Boolean(await db.prepare("SELECT 1 AS found FROM treaties WHERE pair_key=? AND kind=? AND status='broken' AND broken_by=? LIMIT 1")
     .bind(pairKey(attacker, defender), kind, defender).first().catch(tolerate(isMissingRelation, null)));
   const embargo = Boolean(await db.prepare("SELECT 1 AS found FROM embargoes WHERE actor_nation=? AND target_nation=? AND status='in_force' LIMIT 1")
     .bind(defender, attacker).first().catch(tolerate(isMissingRelation, null)));
-  return { napBrokenByTarget: await broken('non-aggression'), embargoAgainstUs: embargo, tradeTreatyBrokenByTarget: await broken('trade'), borderIncidents: 0, openCommonsDispute: false };
+  return { napBrokenByTarget: await broken('non-aggression'), embargoAgainstUs: embargo, tradeTreatyBrokenByTarget: await broken('trade'),
+    borderIncidents: incidents ? await borderIncidentCount(db, defender, attacker, now) : 0, openCommonsDispute: false };
 }
 /** #426: player-facing refusal lines. Same sentences as the proposed second variants in Content's declaration refusal copy module (it is deliberately kept unwired, so it is
  *  not imported here); Content can move these into the copy module and wire them later. Only the docs' figures: 2 active offensive wars; the interval appears as a date. */
@@ -141,7 +144,7 @@ async function declarationLimit(db: GameDatabase, attacker: WarNationId, defende
   const last = await db.prepare('SELECT MAX(declared_at) AS last FROM wars WHERE attacker_nation=?').bind(attacker).first<{ last: number | null }>();
   const open = await db.prepare('SELECT COUNT(*) AS n FROM wars WHERE attacker_nation=? AND ended_at IS NULL').bind(attacker).first<{ n: number }>();
   const lastDeclaredAt = last?.last == null ? null : Number(last.last);
-  const block = declarationLimitBlock({ now, lastDeclaredAt, activeOffensiveWars: Number(open?.n ?? 0), grievance: grievanceScore(await readGrievanceInputs(db, attacker, defender)) });
+  const block = declarationLimitBlock({ now, lastDeclaredAt, activeOffensiveWars: Number(open?.n ?? 0), grievance: grievanceScore(await readGrievanceInputs(db, attacker, defender, now)) });
   return block ? fail(409, block, limitText(block, lastDeclaredAt)) : null;
 }
 

@@ -186,6 +186,7 @@ const previewOnFlags = [
   'HARIMU_BATTLE_TERRAIN_ENABLED', // #1491 packed in HARIMU_GRAY_PACK, after the NAP gate (index 98, GRAY 98)
   'HARIMU_REPUTATION_DEBASEMENT_ENABLED', // #1496 packed in HARIMU_GRAY_PACK, after battle terrain (index 99, GRAY 100)
   'HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED', // #1506 packed in HARIMU_GRAY_PACK, after reputation debasement (index 100). indexOf only; pack length is not pinned.
+  'HARIMU_BORDER_INCIDENTS_ENABLED', // #1527 packed in HARIMU_GRAY_PACK (GRAY 105; index 103 today, after war-loss confidence). Grievance effect needs the war limits flags.
   'HARIMU_TREATY_BREAK_ENABLED', // #1507 packed in HARIMU_GRAY_PACK (GRAY 102; index 101 today, after Crown Confidence to Stability). Needs HARIMU_DIPLOMACY_ENABLED.
   'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED', // #1515 packed in HARIMU_GRAY_PACK, after treaty-break (index 102). indexOf only; pack length is not pinned.
 

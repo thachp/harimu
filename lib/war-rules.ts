@@ -60,7 +60,7 @@ export const grievanceConfig = {
   embargoAgainstUs: 20,
   /** In-force trade treaty broken by the target. */
   tradeTreatyBrokenByTarget: 15,
-  /** Each recorded border incident with the target in the last 30 real days, capped. No border-incident store exists yet, so callers pass 0. */
+  /** Each recorded border incident with the target in the last 30 real days, capped. #1527: lib/border-incidents.ts is the store (flag off: 0). */
   borderIncidentEach: 10, borderIncidentCap: 30, borderIncidentWindowSeconds: 30 * 86400,
   /** An open Commons dispute with the target. No Commons dispute store exists yet, so callers pass false. */
   openCommonsDispute: 10,
