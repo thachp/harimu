@@ -1,6 +1,7 @@
-/** #743 slice 1, #1462 slice 2, #1503 slice 3 and #1523: out-of-character Report intake (docs moderation-safety §21.3, §21.1). Write-only from the
- *  player side: no API returns report rows to players. Table from migrations 0070, 0133 and 0135. Flag HARIMU_REPORTS_ENABLED.
- *  A citizen-message may be a live square, city, global, DM or embassy message, or — when HARIMU_PARTY_CHAT_ENABLED or HARIMU_CONGREGATION_CHAT_ENABLED is on — a live party or congregation message in the reporter's current membership, not their own. */
+/** #743 slice 1, #1462 slice 2, #1503 slice 3, #1523 and #1531: out-of-character Report intake (docs moderation-safety §21.3, §21.1). Write-only from the
+ *  player side: no API returns report rows to players. Table from migrations 0070, 0133, 0135 and 0138. Flag HARIMU_REPORTS_ENABLED.
+ *  A citizen-message may be a live square, city, global, DM or embassy message, or — when HARIMU_PARTY_CHAT_ENABLED or HARIMU_CONGREGATION_CHAT_ENABLED is on — a live party or congregation message in the reporter's current membership, not their own.
+ *  A citizen-name report targets another existing citizens row; the snapshot is the display name as shown (fallback "Citizen"). */
 import {env} from 'cloudflare:workers';
 import type {GameDatabase} from './database-contract';
 import {reasonsFor,reportReasons,type ReportReasonId} from './report-copy';
@@ -17,10 +18,10 @@ import {congregationChatFlagOn} from './congregation-chat';
 
 export const reportDailyLimit=10;
 export const reportNoteMax=280;
-export type ReportKind='citizen-message'|'notable-reply'|'ai-leader-address'|'ai-news'|'player-article'|'square-poster';
+export type ReportKind='citizen-message'|'notable-reply'|'ai-leader-address'|'ai-news'|'player-article'|'square-poster'|'citizen-name';
 export type ReportResult={status:number;body:Record<string,unknown>};
-const kinds:readonly ReportKind[]=['citizen-message','notable-reply','ai-leader-address','ai-news','player-article','square-poster'];
-const looseKind=(kind:string)=>kind==='ai-leader-address'||kind==='ai-news'||kind==='player-article'||kind==='square-poster';
+const kinds:readonly ReportKind[]=['citizen-message','notable-reply','ai-leader-address','ai-news','player-article','square-poster','citizen-name'];
+const looseKind=(kind:string)=>kind==='ai-leader-address'||kind==='ai-news'||kind==='player-article'||kind==='square-poster'||kind==='citizen-name';
 const err=(status:number,error:string,extra:Record<string,unknown>={}):ReportResult=>({status,body:{error,...extra}});
 
 /** The daily cap is one conditional upsert on the reporter's day row: a row lock on Postgres and a single writer on D1, so parallel requests cannot pass it.
@@ -74,6 +75,13 @@ async function targetVisible(db:GameDatabase,userId:string,nationId:string,kind:
  return Boolean(await db.prepare("SELECT 1 AS ok FROM harimu_ai_reservations WHERE request_id=? AND status='finished'").bind((await ownerPrefix(userId))+targetId).first());
 }
 
+async function citizenNameSnapshot(db:GameDatabase,userId:string,targetId:string){
+ if(targetId===userId.toLowerCase())return null;
+ const row=await db.prepare('SELECT display_name FROM citizens WHERE clerk_user_id=?').bind(targetId).first<{display_name:string|null}>();
+ if(!row)return null;
+ const name=(row.display_name??'').trim()||'Citizen';
+ return name.slice(0,280);
+}
 export async function submitReport(db:GameDatabase,userId:string,nationId:string,body:Record<string,unknown>,now:number):Promise<ReportResult>{
  const {requestId,targetKind,targetId,reasonId,note}=body;
  if(typeof requestId!=='string'||!uuidPattern.test(requestId))return err(400,'A valid request ID is required.');
@@ -89,10 +97,13 @@ export async function submitReport(db:GameDatabase,userId:string,nationId:string
  const same=(row:{reporter_id:string;target_kind:string;target_id:string;reason_id:string}|null)=>row&&row.reporter_id===userId&&row.target_kind===kind&&row.target_id===target&&row.reason_id===reasonId;
  const prior=await db.prepare('SELECT reporter_id,target_kind,target_id,reason_id FROM moderation_reports WHERE request_id=?').bind(request).first<{reporter_id:string;target_kind:string;target_id:string;reason_id:string}>();
  if(prior)return same(prior)?{status:201,body:{ok:true}}:err(409,'Request already used.');
- const snapshot=kind==='square-poster'?await squarePosterReport(db,userId,target,now):null;
- if(kind==='square-poster'){if(snapshot===null)return err(404,'That item is not available to report.');}
+ const snapshot=kind==='square-poster'?await squarePosterReport(db,userId,target,now):kind==='citizen-name'?await citizenNameSnapshot(db,userId,target):null;
+ if(kind==='square-poster'||kind==='citizen-name'){if(snapshot===null)return err(404,'That item is not available to report.');}
  else if(!await targetVisible(db,userId,nationId,kind,target,now))return err(404,'That item is not available to report.');
- if(await db.prepare('SELECT 1 AS ok FROM moderation_reports WHERE reporter_id=? AND target_kind=? AND target_id=?').bind(userId,kind,target).first())return err(409,'You already reported this.',{duplicate:true});
+ const already=kind==='citizen-name'
+  ?await db.prepare('SELECT 1 AS ok FROM moderation_reports WHERE reporter_id=? AND target_kind=? AND target_id=? AND target_snapshot=?').bind(userId,kind,target,snapshot).first()
+  :await db.prepare('SELECT 1 AS ok FROM moderation_reports WHERE reporter_id=? AND target_kind=? AND target_id=?').bind(userId,kind,target).first();
+ if(already)return err(409,'You already reported this.',{duplicate:true});
  const day=Math.floor(now/86400);
  if(!(await db.prepare(takeSlotSql).bind(userId,day,reportDailyLimit).run()).meta.changes)return err(429,`You can send up to ${reportDailyLimit} reports a day.`);
  const result=await db.prepare(insertSql).bind(crypto.randomUUID(),request,userId,kind,target,reasonId as ReportReasonId,cleanNote,now,snapshot).run();

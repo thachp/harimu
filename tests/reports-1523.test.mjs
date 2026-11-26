@@ -140,7 +140,7 @@ test('#1523 mutations: dropping a membership, own-message, deleted, channel-flag
     { find: "JOIN congregation_members c ON c.user_id=? AND c.congregation_id=m.congregation_id", replace: "JOIN congregation_members c ON c.congregation_id=m.congregation_id", pattern: "a non-member, a former member" },
     { find: "JOIN congregation_members c ON c.user_id=? AND c.congregation_id=m.congregation_id", replace: "JOIN congregation_members c ON c.user_id=?", pattern: "a different congregation" },
     { edits: [
-      { find: "if(await db.prepare('SELECT 1 AS ok FROM moderation_reports WHERE reporter_id=? AND target_kind=? AND target_id=?').bind(userId,kind,target).first())return err(409,'You already reported this.',{duplicate:true});", replace: "if(false)return err(409,'You already reported this.',{duplicate:true});" },
+      { find: "if(already)return err(409,'You already reported this.',{duplicate:true});", replace: "if(false)return err(409,'You already reported this.',{duplicate:true});" },
       { find: "if(replay)return same(replay)?{status:201,body:{ok:true}}:err(409,'Request already used.');\n return err(409,'You already reported this.',{duplicate:true});", replace: "if(replay)return same(replay)?{status:201,body:{ok:true}}:err(409,'Request already used.');\n return {status:201,body:{ok:true}};" },
     ], pattern: "a second report of the same party message is a duplicate" },
     { find: "if(!(await db.prepare(takeSlotSql).bind(userId,day,reportDailyLimit).run()).meta.changes)return err(429,`You can send up to ${reportDailyLimit} reports a day.`);", replace: "if(false)return err(429,`You can send up to ${reportDailyLimit} reports a day.`);", pattern: "an eleventh report in the day is refused" },
