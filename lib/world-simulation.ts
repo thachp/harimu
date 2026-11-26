@@ -109,7 +109,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
     [{ name: 'korundPresidium', on: options.korundPresidium === true, run: () => runKorundPresidium(db, now) },
      { name: 'korundRaids', on: options.faithFestivals === true, run: () => runKorundRaids(db, now).catch(warnOnly('Korund inspection')) }],
     // #308 AI treaties, then #601 targeted goods sanctions (only the citizen POST path passes it, never a GET), then #363 embargoes.
-    [{ name: 'diplomacy', on: options.diplomacy === true, run: () => runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true, debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }).catch(warnOnly('diplomacy')) },
+    [{ name: 'diplomacy', on: options.diplomacy === true, run: () => runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED'), treatyBreak: flagOn(options.atlasEnv, 'HARIMU_TREATY_BREAK_ENABLED'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true, debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }).catch(warnOnly('diplomacy')) },
      { name: 'targetedSanctions', on: options.targetedSanctions === true, run: () => decideProposedGoodsSanctions(db, now).catch(warnOnly('goods sanction')) },
      { name: 'embargo', on: options.embargo === true, run: () => runEmbargo(db, now).catch(warnOnly('embargo')) },
      // #427: the Kindle Assembly votes on pending war declarations after diplomacy, so a pact ratified this tick blocks the declaration on re-check
