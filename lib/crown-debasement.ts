@@ -2,7 +2,7 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { leaderPersonas } from './leader-personas';
 import { pressPack } from './press-templates';
-import { confidenceAfter, crownConfig, crownDecreeIdOk, debasedParity, debasementBpOk, gameYear, monarchPlan, officialTesseraMilli, rumoredPremiumBp } from './crown-debasement-rules';
+import { confidenceAfter, crownConfidenceWithWarLosses, crownConfig, crownDecreeIdOk, debasedParity, debasementBpOk, gameYear, monarchPlan, officialTesseraMilli, rumoredPremiumBp } from './crown-debasement-rules.ts';
 import { crownYearWindow, emissionCapsConfig } from './emission-caps-rules'; // #885
 export * from './crown-debasement-rules';
 
@@ -47,26 +47,44 @@ async function latestDecree(db: GameDatabase): Promise<Row | null> {
   return db.prepare(`SELECT ${columns} FROM crown_decrees ORDER BY game_year DESC LIMIT 1`).first<Row>().catch(tolerate(isMissingRelation, null));
 }
 
+const lostWarSql = "SELECT COUNT(*) AS n FROM war_end_terms WHERE status='enacted' AND proposer_nation='aurelle' AND kind IN ('surrender','concession') AND decided_at<=?";
+/** #1515: enacted Aurelle surrender or ceding-concession rows as of `at` (decided_at ≤ at). Missing war_end_terms counts as 0. */
+async function countAurelleLostWars(db: GameDatabase, at: number): Promise<number> {
+  try {
+    const row = await db.prepare(lostWarSql).bind(at).first<{ n: number }>();
+    const n = Number(row?.n);
+    return Number.isSafeInteger(n) && n > 0 ? n : 0;
+  } catch (error) {
+    if (isMissingRelation(error)) return 0;
+    throw error;
+  }
+}
+const decreeConfidence = (value: unknown) => {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : crownConfig.baselineConfidence;
+};
+
 /** Read-only. Flag off: the caller does not call this. A database without migration 0042 reads as the baseline. */
-export async function readCrownMint(db: GameDatabase, now: number): Promise<CrownMint> {
-  const row = await latestDecree(db);
+export async function readCrownMint(db: GameDatabase, now: number, options: { warLoss?: boolean } = {}): Promise<CrownMint> {
+  const warLoss = options.warLoss === true;
+  const [row, losses] = await Promise.all([latestDecree(db), warLoss ? countAurelleLostWars(db, now) : 0]);
   const parity = row ? Number(row.parity_after) : crownConfig.baselineParity;
-  return { mintParity: parity, baselineParity: crownConfig.baselineParity, currencyConfidence: row ? Number(row.confidence_after) : crownConfig.baselineConfidence,
+  const stored = row ? decreeConfidence(row.confidence_after) : crownConfig.baselineConfidence;
+  return { mintParity: parity, baselineParity: crownConfig.baselineParity, currencyConfidence: warLoss ? crownConfidenceWithWarLosses(stored, losses) : (row ? Number(row.confidence_after) : crownConfig.baselineConfidence),
     officialRate: { from: 'CRN', to: 'TSR', tesseraMilliPerCrown: officialTesseraMilli(parity), source: crownRateSource },
     rumoredFullWeightPremiumBp: rumoredPremiumBp(parity, now), lastDecree: row ? publicDecree(row) : null };
 }
 
-/** #1506: the stored confidence_after as of `at` (latest decree with decreed_at ≤ at). Baseline 100 when no such decree exists. Returns null when crown_decrees is missing, so the Stability step can omit the term. Same-timestamp ties are broken by game_year descending, then id descending. */
-export async function readCrownConfidenceAt(db: GameDatabase, at: number): Promise<number | null> {
-  try {
-    const row = await db.prepare('SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1').bind(at).first<{ confidence_after: number }>();
-    if (!row) return crownConfig.baselineConfidence;
-    const value = Math.round(Number(row.confidence_after));
-    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : crownConfig.baselineConfidence;
-  } catch (error) {
-    if (isMissingRelation(error)) return null;
-    throw error;
-  }
+/** #1506: the stored confidence_after as of `at` (latest decree with decreed_at ≤ at). Baseline 100 when no such decree exists. Returns null when crown_decrees is missing, so the Stability step can omit the term. Same-timestamp ties are broken by game_year descending, then id descending.
+ *  #1515: when `warLoss` is on, the returned value is that stored Confidence minus the as-of war-loss term (decided_at ≤ at). A missing war_end_terms table leaves the decree-only value. */
+export async function readCrownConfidenceAt(db: GameDatabase, at: number, options: { warLoss?: boolean } = {}): Promise<number | null> {
+  const warLoss = options.warLoss === true;
+  const decreeQuery = db.prepare('SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1').bind(at).first<{ confidence_after: number }>()
+    .catch((error: unknown) => { if (isMissingRelation(error)) return 'missing' as const; throw error; });
+  const [row, losses] = await Promise.all([decreeQuery, warLoss ? countAurelleLostWars(db, at) : 0]);
+  if (row === 'missing') return null;
+  const stored = row ? decreeConfidence(row.confidence_after) : crownConfig.baselineConfidence;
+  return warLoss ? crownConfidenceWithWarLosses(stored, losses) : stored;
 }
 
 export type DecreeCommand = { requestId: string; percentBp: number; decreedBy?: string };
