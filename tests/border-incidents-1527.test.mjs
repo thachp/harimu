@@ -106,6 +106,17 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await c.rows(), [], 'no incident written anywhere');
   });
 
+  test(`#1527 ${backend}: any other error from the table check still surfaces: the purchase and the founding fail and change nothing`, async t => {
+    const c = await setup(t); await c.tessera(5000);
+    const locked = new Proxy(c.r.db, { get: (db, k) => k === 'prepare' ? sql => /^SELECT 1 AS ok FROM border_incidents/.test(sql) ? { first: () => Promise.reject(new Error('database is locked')) } : db.prepare(sql) : typeof db[k] === 'function' ? db[k].bind(db) : db[k] });
+    await c.site([['korund', 20, 13], ['kindle', 22, 14]]);
+    await assert.rejects(c.buy(ON, randomUUID(), locked), /database is locked/);
+    assert.equal((await c.r.db.prepare('SELECT owner FROM world_squares WHERE x=21 AND y=13').first()).owner, null, 'nothing bought');
+    await c.site([['kindle', 24, 12]]);
+    await assert.rejects(c.found(ON, undefined, locked), /database is locked/);
+    assert.equal(Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM world_cities').first()).n), 0, 'nothing founded');
+  });
+
   test(`#1527 ${backend}: flag on, a city founding records one incident per nation touching the claimed block, at the centre; replay writes nothing`, async t => {
     const c = await setup(t);
     await c.site([['kindle', 24, 12], ['aurelle', 25, 13]]);
@@ -155,6 +166,7 @@ test('#1527 mutants: dropping a write guard, the missing-table tolerance, the wi
     { file: 'lib/war.ts', find: 'borderIncidentCount(db, defender, attacker, now)', replace: 'borderIncidentCount(db, attacker, defender, now)' },
     { file: 'lib/world-registry.ts', find: "borderIncidentTargets(squares, nationId, [{ x, y }])", replace: '[]' },
     { file: 'lib/border-incidents.ts', find: 'if (isMissingRelation(error)) return false; throw error;', replace: 'throw error;' }, // ARC #1536: the missing-table tolerance
+    { file: 'lib/border-incidents.ts', find: 'if (isMissingRelation(error)) return false; throw error;', replace: 'return false;' }, // QA1 nit: swallowing every error
     { file: 'lib/world-registry.ts', find: 'borderIncidentsEnabled(env) && await borderIncidentTableReady(db) ?', replace: 'borderIncidentsEnabled(env) ?' },
     { file: 'lib/city-founding.ts', find: 'borderIncidentsEnabled(env) && await borderIncidentTableReady(db) ?', replace: 'borderIncidentsEnabled(env) ?' },
   ];
