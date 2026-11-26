@@ -3,6 +3,7 @@
  *  Layout bundles that omit the define have no `process`. A missing flag is off. Only the exact string "true" enables it.
  *  Labels are the nation's and city's existing names. The hrefs are the same scene query the page already reads. */
 import { sceneUrl } from './scene-navigation.ts';
+export { placeNavShown, placeRailCurrent, placeRailLevels } from './place-nav.ts';
 
 export const ZOOM_PATH_FLAG = 'NEXT_PUBLIC_HARIMU_ZOOM_PATH';
 export function zoomPathFlag(): string | undefined {
@@ -19,15 +20,15 @@ export function isZoomPathView(view: string): view is ZoomPathView {
   return (zoomPathViews as readonly string[]).includes(view);
 }
 
-export type ZoomPathCrumb = { view: ZoomPathView; label: string; href: string; current: boolean };
+export type ZoomPathCrumb = { view: ZoomPathView | 'neighborhood'; label: string; href: string; current: boolean };
 
 /** A same-origin query the game page already accepts. Clicking still goes through the shell's navigate, which owns history. */
-export function zoomPathHref(view: ZoomPathView, nationId?: string, cityId?: string, visitor = false): string {
-  const url = new URL(sceneUrl('https://harimu.local/', view, nationId, view === 'square' ? cityId : undefined, false, visitor));
+export function zoomPathHref(view: ZoomPathView | 'neighborhood', nationId?: string, cityId?: string, visitor = false, district?: string): string {
+  const url = new URL(sceneUrl('https://harimu.local/', view, nationId, view === 'square' || view === 'neighborhood' ? cityId : undefined, false, visitor, view === 'neighborhood' ? district ?? null : null));
   return url.search;
 }
 
-/** Crumbs for the three zoom views. Household and the other places are omitted. Earlier steps are links; the last is current. */
+/** Crumbs for the zoom views. Household and the other places are omitted. `neighborhood` adds that crumb (the level name) after City. Earlier steps are links; the last is current. */
 export function zoomPathCrumbs(input: {
   view: string;
   nationLabel: string;
@@ -35,13 +36,16 @@ export function zoomPathCrumbs(input: {
   nationId?: string;
   cityId?: string;
   visitor?: boolean;
+  neighborhood?: boolean;
+  district?: string | null;
 }): ZoomPathCrumb[] | null {
-  if (!isZoomPathView(input.view)) return null;
-  const steps: ZoomPathView[] = input.view === 'world' ? ['world'] : input.view === 'country' ? ['world', 'country'] : ['world', 'country', 'square'];
+  const place = Boolean(input.neighborhood) && input.view === 'neighborhood';
+  if (!isZoomPathView(input.view) && !place) return null;
+  const steps: readonly (ZoomPathView | 'neighborhood')[] = input.view === 'world' ? ['world'] : input.view === 'country' ? ['world', 'country'] : place ? ['world', 'country', 'square', 'neighborhood'] : ['world', 'country', 'square'];
   return steps.map(view => ({
     view,
-    label: view === 'world' ? 'World' : view === 'country' ? input.nationLabel : input.cityLabel,
-    href: zoomPathHref(view, input.nationId, input.cityId, input.visitor),
+    label: view === 'world' ? 'World' : view === 'country' ? input.nationLabel : view === 'neighborhood' ? 'Neighborhood' : input.cityLabel,
+    href: zoomPathHref(view, input.nationId, view === 'square' || view === 'neighborhood' ? input.cityId : undefined, input.visitor, view === 'neighborhood' ? input.district ?? undefined : undefined),
     current: view === input.view,
   }));
 }

@@ -2,7 +2,8 @@ import { economyEnabled } from './economy-flag.ts';
 import { faithEnabled } from './faith-flag.ts';
 import { militaryEnabled } from './military.ts';
 import { neighborhoodEnabled } from './neighborhood.ts';
-import { isDistrictSlot, neighborhoodWalkEnabled } from './neighborhood-walk.ts';
+import { neighborhoodWalkEnabled, takeDistrictParam } from './neighborhood-walk.ts';
+import { applyDistrict, keepDistrict, placeNavShown, placeNavTrail } from './place-nav.ts';
 export const viewModes = ['world', 'country', 'square', 'neighborhood', 'household', 'workplace', 'market', 'government', 'nation', 'military', 'economy', 'faith'] as const;
 export type SceneView = typeof viewModes[number];
 export const sceneHistoryKey = 'harimuScenePath';
@@ -92,16 +93,26 @@ export function guestDemoAllowed(hasCitizenNation: boolean, clerkConfigured: boo
 }
 /** `visitor` (#376): a guest or signed-out visitor has no citizen nation, so the nation they are previewing is the only one every scene shows; keep it in every scene's URL so a reload or shared link stays on it.
  *  A citizen's personal scenes always show their own nation, so for a citizen it stays out of the URL (`visitor` false). */
-export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false, visitor = false): string {
+export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false, visitor = false, district: string | null = null): string {
   const url = new URL(href);
+  const prevNation = url.searchParams.get('nation'), prevCity = url.searchParams.get('city');
   url.searchParams.set('view', scene);
   if (scene === 'nation' || scene === 'world' || scene === 'country' || scene === 'military' || scene === 'economy' || scene === 'faith' || Boolean(cityId) || (keepNation && scene === 'government') || (visitor && Boolean(nationId))) {
     if (nationId) url.searchParams.set('nation', nationId);
   } else url.searchParams.delete('nation');
   // A city belongs to one nation; never carry a previous nation's city forward (#55).
   if (cityId) url.searchParams.set('city', cityId); else url.searchParams.delete('city');
-  if (scene !== 'neighborhood') url.searchParams.delete('district');
+  applyDistrict(url, scene, nationId, prevNation, prevCity, cityId, district);
   return url.href;
+}
+/** #1445: with place nav shown, zooming in pushes the missing levels so Back walks World, Nation, City, Neighborhood. Flag off pushes the one requested view. */
+export function pushPlaceNav(win: { readonly location: { href: string; readonly pathname: string }; readonly history: { readonly state: unknown; pushState(state: unknown, title: string, url?: string | URL | null): void } }, from: string, next: SceneView, nationId?: string, cityId?: string, keepNation = false, visitor = false) {
+  const steps = placeNavShown() ? placeNavTrail(from, next) : [next];
+  const district = steps.includes('neighborhood') ? takeDistrictParam() : null;
+  for (const step of steps) {
+    const href = sceneUrl(win.location.href, step as SceneView, nationId, cityId, keepNation, visitor, step === 'neighborhood' ? district : null);
+    if (href !== win.location.href) win.history.pushState(sceneHistoryState(win.history.state, win.location.pathname), '', href);
+  }
 }
 /**
  * The game page owns every query-only history entry on its own pathname (#56).
@@ -129,7 +140,7 @@ export function normalizeSceneSearch(search: string, nationIds: readonly string[
   const validNation = params.get('nation');
   if (city !== null && (validNation ? !cityInNation(validNation, city) : !nationIds.some(id => cityInNation(id, city)))) params.delete('city');
   const district = params.get('district');
-  if (district !== null && (!neighborhoodWalkEnabled() || params.get('view') !== 'neighborhood' || !isDistrictSlot(district))) params.delete('district');
+  if (district !== null && !keepDistrict(params, district)) params.delete('district');
   const out = params.toString();
   return out ? `?${out}` : '';
 }
