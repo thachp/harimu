@@ -216,12 +216,13 @@ export async function runAiTreatyProposals(db: GameDatabase, now: number, option
   }
   return { status: 'none' as const };
 }
-/** The scheduled Worker's entry. Treaty proposals need diplomacy. #1507 breaks one triggered NAP before #1505, so a break recorded this pass is visible to the embargo decision. The embargo also needs HARIMU_EMBARGO_ENABLED and HARIMU_AI_TREATY_EMBARGO_ENABLED. */
+/** The scheduled Worker's entry. Treaty proposals need diplomacy. When HARIMU_AI_TREATY_EMBARGO_ENABLED is on, #1507 breaks one triggered NAP before #1505, so a break recorded this pass is visible to the embargo decision. That flag off: this cron does not break and does not embargo. The embargo also needs HARIMU_EMBARGO_ENABLED. */
 export async function runDiplomacyCron(db: GameDatabase, now: number, bindings: { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string; HARIMU_TREATY_BREAK_ENABLED?: string; HARIMU_AI_TREATY_EMBARGO_ENABLED?: string; HARIMU_GRAY_PACK?: unknown }) {
   const diplomacyOn = bindings.HARIMU_DIPLOMACY_ENABLED === 'true';
+  const aiEmbargoOn = flagOn(bindings, 'HARIMU_AI_TREATY_EMBARGO_ENABLED');
   const proposals = await runAiTreatyProposals(db, now, { enabled: diplomacyOn, embargo: bindings.HARIMU_EMBARGO_ENABLED === 'true' });
-  if (diplomacyOn && flagOn(bindings, 'HARIMU_TREATY_BREAK_ENABLED')) await breakDueNonAggressionPacts(db, now);
-  if (runAiTreatyEmbargo) await runAiTreatyEmbargo(db, now, { enabled: diplomacyOn && bindings.HARIMU_EMBARGO_ENABLED === 'true' && flagOn(bindings, 'HARIMU_AI_TREATY_EMBARGO_ENABLED') });
+  if (diplomacyOn && aiEmbargoOn && flagOn(bindings, 'HARIMU_TREATY_BREAK_ENABLED')) await breakDueNonAggressionPacts(db, now);
+  if (runAiTreatyEmbargo) await runAiTreatyEmbargo(db, now, { enabled: diplomacyOn && bindings.HARIMU_EMBARGO_ENABLED === 'true' && aiEmbargoOn });
   return proposals;
 }
 
