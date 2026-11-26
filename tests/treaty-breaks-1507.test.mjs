@@ -70,7 +70,7 @@ for (const backend of ['sqlite', 'postgres']) {
     await insertEmbargo(r, { id: 'e-kk', actor: 'korund', target: 'kindle', now });
     await insertEmbargo(r, { id: 'e-ak', actor: 'korund', target: 'aurelle', now });
 
-    // A4 "a GET writes nothing" is for readTreaties / readWorldReputation only. GET /api/world is the production tick and can write when the flag is on, like expiry, renewal and proposals.
+    // A4 "a GET writes nothing" is for readTreaties / readWorldReputation only. GET /api/world is the GET that writes (the production tick). GET /api/citizen only calls readWorldSimulation; advanceWorld runs from POST /api/citizen.
     const beforeReads = await Promise.all(['t-quiet', 't-ak', 't-trade'].map(id => row(id)));
     await d.readTreaties(r.db, now);
     await d.readWorldReputation(r.db, now);
@@ -152,6 +152,35 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(broke.broken_by, 'kindle', 'broken_by is the embargo target');
   });
 
+  test(`#1507 (${backend}): when the first candidate cannot be broken, the next candidate in the batch is broken`, async t => {
+    const { r, d, now, row } = await setup(t, backend);
+    // 20 older expired Kindle–Korund NAPs still have ends_at in the future, so dropping the in-force filter fills LIMIT 20 and hides t-next.
+    for (let i = 0; i < 20; i++) await insertTreaty(r, { id: `t-stale-${i}`, proposer: 'kindle', other: 'korund', now, status: 'expired', at: now - 400 + i });
+    await insertTreaty(r, { id: 't-next', proposer: 'kindle', other: 'korund', now, at: now - 10 });
+    await insertEmbargo(r, { id: 'e-next', actor: 'korund', target: 'kindle', now });
+    // treaties/embargoes CHECK only allows Kindle, Korund or Aurelle, so a non-treaty breaker and a missing treaty (breakTreaty refuses) are prepended as the first batch rows.
+    const orig = r.db.prepare.bind(r.db);
+    r.db.prepare = (sql) => {
+      const stmt = orig(sql);
+      if (!sql.includes('e.target_nation AS breaker')) return stmt;
+      const wrap = (bound) => {
+        const origAll = bound.all.bind(bound);
+        bound.all = async () => {
+          const res = await origAll();
+          return { ...res, results: [{ id: 't-skip-nation', breaker: 'hoarvale' }, { id: 't-missing', breaker: 'kindle' }, ...(res.results ?? [])] };
+        };
+        return bound;
+      };
+      const origBind = stmt.bind.bind(stmt);
+      stmt.bind = (...args) => wrap(origBind(...args));
+      return wrap(stmt);
+    };
+    await d.runDiplomacy(r.db, now, { treatyBreak: true });
+    assert.equal((await row('t-next')).status, 'broken', 'when the first candidate cannot be broken, the next candidate in the batch is broken');
+    assert.equal((await row('t-next')).broken_by, 'kindle');
+    for (let i = 0; i < 20; i++) assert.equal((await row(`t-stale-${i}`)).status, 'expired');
+  });
+
   test(`#1507 (${backend}): a lifted or proposed embargo from the counterpart leaves the NAP in force`, async t => {
     const { r, d, now, row } = await setup(t, backend);
     await insertTreaty(r, { id: 't-lift', proposer: 'kindle', other: 'korund', now, at: now - 20 });
@@ -166,7 +195,7 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-test('#1507 mutations: breaking when the flag is off, forcing the world tick off or on, breaking with no trigger, a non-in-force embargo, or a trade, swapping broken_by, and ignoring the one-per-slot guard all fail', () => {
+test('#1507 mutations: breaking when the flag is off, forcing the world tick off or on, breaking with no trigger, a non-in-force embargo, or a trade, swapping broken_by, ignoring the one-per-slot guard, dropping the in-force filter, or ending the batch after a skipped or refused candidate all fail', () => {
   const cases = [
     { file: 'lib/diplomacy.ts', find: 'if (options.treatyBreak === true) await breakDueNonAggressionPacts(db, now);', replace: 'if (true) await breakDueNonAggressionPacts(db, now);', pattern: 'HARIMU_TREATY_BREAK_ENABLED off writes no break' },
     { file: 'lib/world-simulation.ts', find: "treatyBreak: flagOn(options.atlasEnv, 'HARIMU_TREATY_BREAK_ENABLED')", replace: 'treatyBreak: true', pattern: 'HARIMU_TREATY_BREAK_ENABLED off writes no break' },
@@ -176,6 +205,9 @@ test('#1507 mutations: breaking when the flag is off, forcing the world tick off
     { file: 'lib/diplomacy.ts', find: "JOIN embargoes e ON e.status='in_force' AND e.target_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation<>e.target_nation", replace: "JOIN embargoes e ON e.status<>'' AND e.target_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation<>e.target_nation", pattern: 'a lifted or proposed embargo from the counterpart leaves the NAP in force' },
     { file: 'lib/diplomacy.ts', find: 'e.target_nation AS breaker', replace: 'e.actor_nation AS breaker', pattern: "the injured nation's napBrokenByTarget is true" },
     { file: 'lib/diplomacy.ts', find: "SELECT 1 AS found FROM treaties WHERE status='broken' AND ended_at>=? AND ended_at<?", replace: "SELECT 1 AS found FROM treaties WHERE status='broken' AND ended_at>=? AND ended_at<? AND 1=0", pattern: 'a second break is a no-op in the same slot' },
+    { file: 'lib/diplomacy.ts', find: "WHERE t.kind='non-aggression' AND t.status='in_force' AND t.ends_at>?", replace: "WHERE t.kind='non-aggression' AND t.ends_at>?", pattern: 'the next candidate in the batch is broken' },
+    { file: 'lib/diplomacy.ts', find: 'if (result.ok) return { status: \'broken\' as const, treaty: result.treaty };', replace: 'if (result.ok) return { status: \'broken\' as const, treaty: result.treaty }; return { status: \'none\' as const };', pattern: 'the next candidate in the batch is broken' },
+    { file: 'lib/diplomacy.ts', find: 'if (!isTreatyNation(row.breaker)) continue;', replace: 'if (!isTreatyNation(row.breaker)) return { status: \'none\' as const };', pattern: 'the next candidate in the batch is broken' },
   ];
   const tree = mutantTree(); // #1480: never mutate the shared tree that parallel test files read
   try {

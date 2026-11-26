@@ -158,7 +158,7 @@ export async function runDiplomacy(db: GameDatabase, now: number, options: { ren
   await decideProposedTreaties(db, now, options);
 }
 
-/** #1507: at most one in-force NAP is broken per treaty slot, only when the counterpart already has an in-force embargo against the breaker. Called from the diplomacy world tick (GET /api/world and GET /api/citizen run advanceWorld; readTreaties and readWorldReputation stay read-only) after expiry and trade renewal, when HARIMU_TREATY_BREAK_ENABLED is on (and diplomacy is already on). Reuses breakTreaty. Idempotent: a second call in the same slot is a no-op. */
+/** #1507: at most one in-force NAP is broken per treaty slot, only when the counterpart already has an in-force embargo against the breaker. Called from the diplomacy world tick (GET /api/world and POST /api/citizen run advanceWorld; GET /api/citizen only calls readWorldSimulation; readTreaties and readWorldReputation stay read-only) after expiry and trade renewal, when HARIMU_TREATY_BREAK_ENABLED is on (and diplomacy is already on). Reuses breakTreaty. Idempotent: a second call in the same slot is a no-op. */
 export async function breakDueNonAggressionPacts(db: GameDatabase, now: number) {
   const slotStart = treatySlot(now) * treatyProposalSlotSeconds;
   // The guard matches any broken treaty in the slot. That is enough while this path only writes NAP breaks; a trade-break follow-up should decide whether trade and NAP breaks share a slot.
