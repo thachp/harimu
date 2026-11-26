@@ -56,6 +56,19 @@ export async function readCrownMint(db: GameDatabase, now: number): Promise<Crow
     rumoredFullWeightPremiumBp: rumoredPremiumBp(parity, now), lastDecree: row ? publicDecree(row) : null };
 }
 
+/** #1506: the stored confidence_after as of `at` (latest decree with decreed_at ≤ at). Baseline 100 when no such decree exists. Returns null when crown_decrees is missing, so the Stability step can omit the term. Same-timestamp ties are broken by game_year descending, then id descending. */
+export async function readCrownConfidenceAt(db: GameDatabase, at: number): Promise<number | null> {
+  try {
+    const row = await db.prepare('SELECT confidence_after FROM crown_decrees WHERE decreed_at<=? ORDER BY decreed_at DESC, game_year DESC, id DESC LIMIT 1').bind(at).first<{ confidence_after: number }>();
+    if (!row) return crownConfig.baselineConfidence;
+    const value = Math.round(Number(row.confidence_after));
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : crownConfig.baselineConfidence;
+  } catch (error) {
+    if (isMissingRelation(error)) return null;
+    throw error;
+  }
+}
+
 export type DecreeCommand = { requestId: string; percentBp: number; decreedBy?: string };
 const sqlText = (value: string) => `'${value.replace(/'/g, "''")}'`;
 /** Server-side only. The Monarch's debasement decree: parity rises by `percentBp` (1-1500, the docs' 15% cap), Currency Confidence falls by a fixed amount and one
