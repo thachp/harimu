@@ -1,4 +1,4 @@
-/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is index 103, after war-loss (#1515, index 102). */
+/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is index 104, after embargo stability (#1526, index 103). */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -65,15 +65,15 @@ describe('#1505', { concurrency: 1 }, () => {
     assert.deepEqual(lifts([row('e-k', 'korund', 'aurelle'), row('e-a', 'aurelle', 'kindle')], []), ['e-a', 'e-k']);
   });
 
-  test('the flag is preview true, production false, and index 103 after war-loss', () => {
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED'), 102);
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 103);
+  test('the flag is preview true, production false, and index 104 after embargo stability', () => {
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_EMBARGO_STABILITY_ENABLED'), 103);
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 104);
     const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
     assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 103);
-    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 103);
+    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 104);
+    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 104);
     const cron = readFileSync('lib/diplomacy.ts', 'utf8');
     const body = cron.slice(cron.indexOf('export async function runDiplomacyCron'));
     assert.ok(body.indexOf('breakDueNonAggressionPacts') >= 0 && body.indexOf('breakDueNonAggressionPacts') < body.indexOf('runAiTreatyEmbargo'), 'treaty break runs before the AI embargo in the same cron pass');

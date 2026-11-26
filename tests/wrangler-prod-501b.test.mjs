@@ -188,7 +188,8 @@ const previewOnFlags = [
   'HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED', // #1506 packed in HARIMU_GRAY_PACK, after reputation debasement (index 100). indexOf only; pack length is not pinned.
   'HARIMU_TREATY_BREAK_ENABLED', // #1507 packed in HARIMU_GRAY_PACK (GRAY 102; index 101 today, after Crown Confidence to Stability). Needs HARIMU_DIPLOMACY_ENABLED.
   'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED', // #1515 packed in HARIMU_GRAY_PACK, after treaty-break (index 102). indexOf only; pack length is not pinned.
-  'HARIMU_AI_TREATY_EMBARGO_ENABLED', // #1505 packed in HARIMU_GRAY_PACK at index 103, after war-loss. indexOf only.
+  'HARIMU_EMBARGO_STABILITY_ENABLED', // #1526 packed in HARIMU_GRAY_PACK, after war-loss (index 103). indexOf only; pack length is not pinned.
+  'HARIMU_AI_TREATY_EMBARGO_ENABLED', // #1505 packed in HARIMU_GRAY_PACK at index 104, after embargo stability. indexOf only.
   'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED', // #1134 packed in HARIMU_GRAY_PACK
   'HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED', // #1469 packed in HARIMU_GRAY_PACK (index 94, GRAY 95)
   'HARIMU_DIPLOMACY_ENABLED',

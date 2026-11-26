@@ -34,6 +34,7 @@ import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 import { readCrownConfidenceAt } from './crown-debasement'; // #1506
+import { readEmbargoStabilityAt } from './embargo-stability'; // #1526
 import { korundRationCutCities, korundRationRecoveryCities, korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from './korund-coupons'; // #967, #983
 import { nextDividendDayAt } from './veldwood-wallet-dividend.ts'; // #1063
 import { flagOn } from './flag-pack.mjs'; // #1239: gate the atlas Red Alert skip without a new flag
@@ -192,12 +193,15 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       // QA3 on #854: Harmony (one query for all nations) is read alongside war weariness, so it adds no sequential round trip when both are on.
       // #1506: Currency Confidence as of the tick's scheduled_at, only while both flags are on (flag off: no read, inputs unchanged).
       const confidenceOn = flagOn(options.atlasEnv, 'HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED') && flagOn(options.atlasEnv, 'HARIMU_CROWN_DEBASEMENT_ENABLED');
-      const [weariness, harmony, rationCuts, rationRecovery, crownConfidence] = await Promise.all([options.warWeariness ? readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined,
+      // #1526: in-force embargo counts as of the tick's scheduled_at, only while both flags are on (flag off: no read, inputs unchanged).
+      const embargoStabilityOn = flagOn(options.atlasEnv, 'HARIMU_EMBARGO_STABILITY_ENABLED') && flagOn(options.atlasEnv, 'HARIMU_EMBARGO_ENABLED');
+      const [weariness, harmony, rationCuts, rationRecovery, crownConfidence, embargoCounts] = await Promise.all([options.warWeariness ? readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined,
         options.religiousHarmony ? readHarmonyScores(db,Number(row.scheduled_at),holidays,festivalStance) : undefined,
         rationStability ? korundRationCutCities(db, epoch, Number(row.scheduled_at)) : undefined,
         rationRecoveryOn ? korundRationRecoveryCities(db, epoch, Number(row.scheduled_at)) : undefined,
-        confidenceOn ? readCrownConfidenceAt(db, Number(row.scheduled_at), { warLoss: flagOn(options.atlasEnv, 'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED') && flagOn(options.atlasEnv, 'HARIMU_WAR_ENDINGS_ENABLED') }) : undefined]);
-      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(rationCuts?{rationCuts}:{}),...(rationRecovery?{rationRecovery}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{}),...(crownConfidence!=null?{crownConfidence}:{})});
+        confidenceOn ? readCrownConfidenceAt(db, Number(row.scheduled_at), { warLoss: flagOn(options.atlasEnv, 'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED') && flagOn(options.atlasEnv, 'HARIMU_WAR_ENDINGS_ENABLED') }) : undefined,
+        embargoStabilityOn ? readEmbargoStabilityAt(db, Number(row.scheduled_at)) : undefined]);
+      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(rationCuts?{rationCuts}:{}),...(rationRecovery?{rationRecovery}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{}),...(crownConfidence!=null?{crownConfidence}:{}),...(embargoCounts?{embargo:embargoCounts}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }

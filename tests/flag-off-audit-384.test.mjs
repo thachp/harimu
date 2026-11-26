@@ -38,6 +38,7 @@ const flagOffPins = {
   HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED: 'confidence-stability-1506.test.mjs', // #1506 flag off: Stability JSON is unchanged and crown_decrees is not read
   HARIMU_TREATY_BREAK_ENABLED: 'treaty-breaks-1507.test.mjs', // #1507 flag off: world tick with diplomacy on writes no break
   HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED: 'war-loss-confidence-1515.test.mjs', // #1515 flag off: Confidence is decree-only and war_end_terms is not read
+  HARIMU_EMBARGO_STABILITY_ENABLED: 'embargo-stability-1526.test.mjs', // #1526 flag off: Stability JSON is unchanged and embargoes is not read
   HARIMU_AI_TREATY_EMBARGO_ENABLED: 'ai-treaty-embargo-1505.test.mjs', // #1505 flag off: no proposal, no lift, and the cron does not break a NAP
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',

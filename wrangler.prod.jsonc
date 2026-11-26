@@ -269,7 +269,9 @@
       "HARIMU_TREATY_BREAK_ENABLED": "false",
       // #1515: enacted Aurelle surrender or ceding concession lowers Crown Currency Confidence at read time (docs §12.4). Off: Confidence is the decree-only value and war_end_terms is not read. Only acts when HARIMU_CROWN_DEBASEMENT_ENABLED and HARIMU_WAR_ENDINGS_ENABLED are on too. After treaty-break at the next dense index.
       "HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED": "false",
-      // #1505: an AI leader embargoes a nation that broke a treaty with it, and lifts that embargo when the break ages out or a new treaty is in force. Off: no proposal and no lift, and the cron does not break a NAP. Also needs HARIMU_DIPLOMACY_ENABLED and HARIMU_EMBARGO_ENABLED. Index 103, after war-loss.
+      // #1526: in-force embargoes lower Stability on both sides at the daily tick (docs §13.3 stand-in). Off: Stability is unchanged and embargoes is not read by the stability step. Only acts when HARIMU_EMBARGO_ENABLED is on too. After war-loss confidence at the next dense index.
+      "HARIMU_EMBARGO_STABILITY_ENABLED": "false",
+      // #1505: an AI leader embargoes a nation that broke a treaty with it, and lifts that embargo when the break ages out or a new treaty is in force. Off: no proposal and no lift, and the cron does not break a NAP. Also needs HARIMU_DIPLOMACY_ENABLED and HARIMU_EMBARGO_ENABLED. Index 104, after embargo stability.
       "HARIMU_AI_TREATY_EMBARGO_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
