@@ -33,6 +33,18 @@ export function debasedParity(parity: number, percentBp: number): number {
 }
 export const debasementBpOk = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 1 && (value as number) <= crownConfig.debasementCapBp;
 export const confidenceAfter = (before: number): number => Math.max(0, before - crownConfig.confidenceDrop);
+/** #1515 [ASSUMPTION, ARC on #1515, citing docs §12.4 "lost wars"]: each counted Aurelle lost war costs this many Confidence points. */
+export const WAR_LOSS_CONFIDENCE_DROP = 10;
+/** #1515 [ASSUMPTION, ARC on #1515]: the total war-loss term is capped at this many points (applied as −cap). */
+export const WAR_LOSS_CONFIDENCE_CAP = 30;
+/** Decree Confidence minus the war-loss term (−10 per lost war, term capped at −30), floored at 0 and never raised. */
+export function crownConfidenceWithWarLosses(decreeConfidence: number, lostWars: number): number {
+  const raw = Math.round(Number(decreeConfidence));
+  const decree = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : crownConfig.baselineConfidence;
+  const n = typeof lostWars === 'number' && Number.isSafeInteger(lostWars) && lostWars > 0 ? lostWars : 0;
+  const term = -Math.min(WAR_LOSS_CONFIDENCE_CAP, n * WAR_LOSS_CONFIDENCE_DROP);
+  return Math.max(0, decree + term);
+}
 /** Official Crown quote in thousandths of a Tessera per Crown. More Crowns per bar means each Crown holds less gold. */
 export function officialTesseraMilli(parity: number): number {
   return Math.floor(crownConfig.baselineTessera * crownConfig.baselineParity / Math.max(1, parity));

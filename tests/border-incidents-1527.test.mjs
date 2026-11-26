@@ -13,8 +13,8 @@ const FLAG = 'HARIMU_BORDER_INCIDENTS_ENABLED', D = 86400, ON = { [FLAG]: 'true'
 const spy = db => { const seen = []; return { seen, db: new Proxy(db, { get(t, k) { if (k === 'prepare') return sql => { seen.push(sql); return t.prepare(sql); }; const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }) }; };
 const touches = seen => seen.filter(sql => /border_incidents/.test(sql));
 
-test('#1527 flag: GRAY 105 at index 102, preview "true", production "false"; migration 0137 is additive, identical, and matches the bootstrap', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 102);
+test('#1527 flag: GRAY 105 at index 103, preview "true", production "false"; migration 0137 is additive, identical, and matches the bootstrap', () => {
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 103); // after #1515 war-loss confidence (index 102)
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) assert.deepEqual([...readFileSync(file, 'utf8').matchAll(/"HARIMU_BORDER_INCIDENTS_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], file);
   const d1 = readFileSync('drizzle/0137_border_incidents.sql', 'utf8');
   assert.equal(readFileSync('db/postgres/0137_border_incidents.sql', 'utf8'), d1);
