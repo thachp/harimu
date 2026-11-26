@@ -46,6 +46,7 @@ async function handleSquarePost(request:Request) {
   if(body.action==='post'){const blocked=await travelBlock(db,userId,now,(env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true');if(blocked)return privateResponse({error:blocked,reason:'traveling'},409);} // #123
   if(body.action==='presence') {
     if(typeof body.active!=='boolean')return privateResponse({error:'Invalid presence choice.'},400);
+    if(body.active){const banned=chatBanRefusal((env as unknown as {HARIMU_CHAT_BAN?:string}).HARIMU_CHAT_BAN,userId,now,'square-presence');if(banned)return privateResponse(banned,403);} // #1517 follow-up: QA1 nit on #1520
     const location=await readCityLocation(db,userId,nationId,now);
     if((body.expectedCityId!==undefined&&body.expectedCityId!==location.currentCityId)||(body.cityId!==undefined&&body.cityId!==location.currentCityId))return privateResponse({error:'City changed. Refresh your current city before sharing presence.'},409);
     if(body.active){const refreshed=await db.prepare(`INSERT INTO square_presence(user_id,nation_id,expires_at) SELECT clerk_user_id,nation_id,? FROM citizens WHERE clerk_user_id=? AND nation_id=? AND EXISTS(SELECT 1 FROM citizen_city_locations WHERE user_id=? AND nation_id=? AND current_city_id=?) ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,expires_at=excluded.expires_at`).bind(now+90,userId,nationId,userId,nationId,location.currentCityId).run();
