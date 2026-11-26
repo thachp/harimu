@@ -37,6 +37,10 @@ for (const backend of ['sqlite', 'postgres']) {
     const c = await setup(t);
     assert.equal((await c.act('alice', 'alice', 'block')).status, 400, 'self');
     assert.equal((await c.act('alice', 'nobody', 'block')).status, 404, 'unknown');
+    const iso = new Date(c.r.now).toISOString(); // QA1 nit: an existing citizen with no nation is unenrolled
+    await c.r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('nomad',NULL,'nomad',18,0,'Good standing',?,?)").bind(iso, iso).run();
+    const nomad = await c.act('alice', 'nomad', 'block');
+    assert.equal(nomad.status, 404, 'unenrolled'); assert.equal(nomad.data.error, 'That citizen is not available.');
     for (const peer of [undefined, '', 42, 'x'.repeat(129)]) assert.equal((await c.act('alice', peer, 'block')).status, 400, String(peer));
     assert.equal((await c.r.call('dm-chat', 'alice', { action: 'block', peer: 'bob' }, 'https://evil.invalid')).status, 403, 'cross-origin');
     assert.equal(await c.n('dm_blocks'), 0, 'refusals wrote nothing');
