@@ -24,6 +24,7 @@ new Function('exports', 'require', 'module', js)(mod.exports, name => {
   if (name === '@/lib/map-zone-labels') return labels;
   if (name === './world-zones.module.css') return { __esModule: true, default: new Proxy({}, { get: (_, k) => String(k) }) };
   if (name === '@/lib/map-zones') return {};
+  if (name === './report-button') return { ReportButton: () => null };
   return require(name);
 }, mod);
 const { ZoneLegend, zoneLegendEnabled } = mod.exports;

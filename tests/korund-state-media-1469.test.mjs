@@ -1,10 +1,10 @@
 /** #1469: Korund State Media writers, kit-only articles (docs §18.2). Flag HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED, GRAY 95. */
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {readFileSync,writeFileSync} from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {localRuntime} from './helpers/local-runtime.mjs';
+import {mutantTree} from './helpers/mutant-tree.mjs';
 import {FLAG_PACKS,flagOn} from '../lib/flag-pack.mjs';
 import {korundStateMediaKit,korundStateMediaEntry,kitTextFits} from '../lib/korund-state-media-kit.ts';
 
@@ -34,10 +34,9 @@ async function setup(t,backend,users=['ava']){
 }
 async function spy(r,fn){const prepare=r.db.prepare.bind(r.db),seen={sql:[]};r.db.prepare=q=>{seen.sql.push(q);return prepare(q);};try{seen.result=await fn();}finally{r.db.prepare=prepare;}return seen;}
 
-test('flag is preview true, production false, GRAY 95 at index 94, and the pack length goes up by 1',()=>{
+test('flag is preview true, production false, GRAY 95 at index 94',()=>{
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_RANKS_ENABLED'),93);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),94);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,98);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),94); // indexOf by name; pack length is not pinned
   const preview=JSON.parse(readFileSync('wrangler.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   const prod=JSON.parse(readFileSync('wrangler.prod.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   assert.equal(preview.vars[FLAG],undefined);
@@ -45,7 +44,7 @@ test('flag is preview true, production false, GRAY 95 at index 94, and the pack 
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG],'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG],'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG),94);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length,98);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG),94);
   assert.equal(flagOn({HARIMU_GRAY_PACK:preview.vars.HARIMU_GRAY_PACK},FLAG),true);
   assert.equal(flagOn({HARIMU_GRAY_PACK:prod.vars.HARIMU_GRAY_PACK},FLAG),false);
 });
@@ -179,18 +178,6 @@ for(const backend of ['sqlite','postgres']) test(`#1469 ${backend}: filing, appr
   assert.equal(latest.data.items.filter(i=>i.kind==='player-article').length,6);
 });
 
-const mutate=(file,find,replace)=>{
-  const original=readFileSync(file,'utf8');
-  const next=original.replace(find,replace);
-  assert.notEqual(next,original,`mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file,next);
-  return ()=>writeFileSync(file,original);
-};
-const run=(files,pattern)=>{
-  const env={...process.env}; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node',['--experimental-strip-types','--test','--test-concurrency=1','--test-name-pattern',pattern,...files],{encoding:'utf8',cwd:new URL('..',import.meta.url).pathname,env});
-};
-
 test('#1469 mutations: replay bind, 24h boundary, off-kit, output_pct, flag gate, LIMIT, and approval record all fail',()=>{
   const file='tests/korund-state-media-1469.test.mjs';
   const cases=[
@@ -202,11 +189,14 @@ test('#1469 mutations: replay bind, 24h boundary, off-kit, output_pct, flag gate
     {file:'lib/korund-state-media.ts',find:'ORDER BY a.published_at DESC, a.id DESC LIMIT 6',replace:'ORDER BY a.published_at DESC, a.id DESC LIMIT 7',pattern:'LIMIT 6'},
     {file:'lib/korund-state-media.ts',find:"KORUND_STATE_MEDIA_APPROVER = 'directorate'",replace:"KORUND_STATE_MEDIA_APPROVER = 'chairman'",pattern:'approval record'},
   ];
-  for(const c of cases){
-    const restore=mutate(c.file,c.find,c.replace);
-    try{
-      const result=run([file],c.pattern);
-      assert.notEqual(result.status,0,`mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
-    }finally{restore();}
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for(const c of cases){
+      const restore=tree.mutate(c.file,c.find,c.replace);
+      try{
+        const result=tree.run([file],c.pattern);
+        assert.notEqual(result.status,0,`mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
+      }finally{restore();}
+    }
+  } finally { tree.close(); }
 });

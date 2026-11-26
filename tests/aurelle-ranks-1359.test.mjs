@@ -1,14 +1,14 @@
 /** #1359: Aurelle noble ranks from lifetime earned Royal Favor (docs §11.6). Flag HARIMU_AURELLE_RANKS_ENABLED, GRAY 94. */
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {readFileSync,writeFileSync} from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
+import {mutantTree} from './helpers/mutant-tree.mjs';
 import {FLAG_PACKS} from '../lib/flag-pack.mjs';
 import {flagOn} from '../lib/flag-pack.mjs';
 import {aurelleRankAt,aurelleRankThresholds,AURELLE_RANKS_FLAG} from '../lib/aurelle-rank-rules.ts';
@@ -40,10 +40,9 @@ async function earn(r,user,points,settledAt=r.now){
 }
 const spend=(r,user,amount,spentAt=r.now)=>r.db.prepare("INSERT INTO aurelle_favor_spends (request_id,clerk_user_id,amount,reason,spent_at) VALUES (?,?,?,'leave-kinward',?)").bind(randomUUID(),user,amount,Math.floor(spentAt/1000)).run();
 
-test('flag is preview true, production false, GRAY 94 at index 93, and the pack length goes up by 1',()=>{
+test('flag is preview true, production false, GRAY 94 at index 93',()=>{
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_KINDLE_NEWSPAPERS_ENABLED'),92);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),93);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,98);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),93); // indexOf by name; pack length is not pinned
   const preview=JSON.parse(readFileSync('wrangler.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   const prod=JSON.parse(readFileSync('wrangler.prod.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   assert.equal(preview.vars[FLAG],undefined);
@@ -52,7 +51,6 @@ test('flag is preview true, production false, GRAY 94 at index 93, and the pack 
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG],'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG),93);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG),93);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length,98);
   assert.equal(flagOn({HARIMU_GRAY_PACK:preview.vars.HARIMU_GRAY_PACK},FLAG),true);
   assert.equal(flagOn({HARIMU_GRAY_PACK:prod.vars.HARIMU_GRAY_PACK},FLAG),false);
   assert.equal(flagOn({HARIMU_GRAY_PACK:preview.vars.HARIMU_GRAY_PACK,[FLAG]:'false'},FLAG),false,'a direct string wins over the pack');
@@ -137,18 +135,6 @@ for(const backend of ['sqlite','postgres']) test(`#1359 GET /api/citizen: flag o
   assert.equal('aurelleRanks' in offAgain.flags,false);
 });
 
-const mutate=(file,find,replace)=>{
-  const original=readFileSync(file,'utf8');
-  const next=original.replace(find,replace);
-  assert.notEqual(next,original,`mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file,next);
-  return ()=>writeFileSync(file,original);
-};
-const run=(files,pattern)=>{
-  const env={...process.env}; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node',['--experimental-strip-types','--test','--test-concurrency=1','--test-name-pattern',pattern,...files],{encoding:'utf8',cwd:new URL('..',import.meta.url).pathname,env});
-};
-
 test('#1359 mutations: threshold boundaries, earned-vs-balance source, and the flag gate all fail',()=>{
   const file='tests/aurelle-ranks-1359.test.mjs';
   const cases=[
@@ -158,11 +144,14 @@ test('#1359 mutations: threshold boundaries, earned-vs-balance source, and the f
     {file:'lib/aurelle-rank.ts',find:'SELECT COALESCE(SUM(favor),0) AS earned FROM aurelle_settlements WHERE clerk_user_id=?',replace:"SELECT MAX(0,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0)) AS earned",files:[file],pattern:'spends do not demote'},
     {file:'app/api/citizen/route.ts',find:'aurelleRanksOn && profile?.nation_id === \'aurelle\' ? readAurelleRank(database, userId, profile.nation_id) : null',replace:'profile?.nation_id === \'aurelle\' ? readAurelleRank(database, userId, profile.nation_id) : null',files:[file],pattern:'flag off has no field'},
   ];
-  for(const c of cases){
-    const restore=mutate(c.file,c.find,c.replace);
-    try{
-      const result=run(c.files,c.pattern);
-      assert.notEqual(result.status,0,`mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
-    }finally{restore();}
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for(const c of cases){
+      const restore=tree.mutate(c.file,c.find,c.replace);
+      try{
+        const result=tree.run(c.files,c.pattern);
+        assert.notEqual(result.status,0,`mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
+      }finally{restore();}
+    }
+  } finally { tree.close(); }
 });

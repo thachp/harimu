@@ -17,7 +17,7 @@ const D = await import(pathToFileURL(out).href);
 const { foreignAffairsPanel:P, treatyKinds:K, treatyStatusLines:S, brokenPactLine, ratificationNews:R, ratificationHeadlines:H, ratificationFor, TREATY_STATUSES, RATIFICATION_KEYS, DIPLOMACY_PLACEHOLDERS, DIPLOMACY_NAME_MAX, DIPLOMACY_LABEL_MAX, DIPLOMACY_BODY_MAX, DIPLOMACY_BYLINES } = D;
 
 const statusLines=()=>TREATY_STATUSES.flatMap(s=>S[s].map(l=>l.text));
-const bodies=()=>[...statusLines(),brokenPactLine.text,...R.map(x=>x.body),...Object.values(K).map(k=>k.effect.text),P.aiNote.text];
+const bodies=()=>[...statusLines(),brokenPactLine.text,...R.map(x=>x.body),...Object.values(K).map(k=>k.effect.text),P.aiNote.text,D.napReputationRefusal.text];
 const heads=()=>[P.header,P.emptyState,...Object.values(H)];
 const all=()=>[...heads(),...bodies(),...Object.values(K).map(k=>k.name)];
 const fill=t=>DIPLOMACY_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(DIPLOMACY_NAME_MAX)),t);

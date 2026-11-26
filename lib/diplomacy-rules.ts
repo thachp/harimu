@@ -50,7 +50,7 @@ export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId)
  *  #1480: withWorldReputationRecord attaches the visible broken-treaty record; the SQL is the same uncapped #1477 source, with one row per break. */
 export type WorldReputationScore = { score: number; brokenPacts: number };
 export type WorldReputationBreak = { other: TreatyNationId; kind: TreatyKind; brokenAt: number; brokenGameDay: number; penalty: number };
-export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number; legitimacy: number };
+export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number; legitimacy: number; debasements?: number };
 export type WorldReputationScoreMap = Record<TreatyNationId, WorldReputationScore>;
 export type WorldReputationMap = Record<TreatyNationId, WorldReputation>;
 export const worldReputationRecordLimit = 10;
@@ -119,6 +119,37 @@ export function withWorldReputationRecord(
   return result;
 }
 
+/** #1496: World Reputation input from Aurelle Crown debasement decrees (docs §13.4 monetary conduct).
+ *  [ASSUMPTION, ARC 7168979568]: −5 per decree in a rolling window of the last 3 Crown game years
+ *  (crown_decrees.game_year against the current year from gameYear in lib/crown-debasement-rules.ts).
+ *  Counted by number of decrees, not size. The window, and a hard cap of 3, keep the debasement
+ *  penalty at most −15 so debasement alone cannot trip the #1502 NAP gate (≤ −20). Placeholder tuning.
+ *  Nothing is stored. */
+export const debasementReputationPenalty = -5;
+export const debasementReputationWindowYears = 3;
+export const debasementReputationMaxCount = 3;
+export function debasementCountInWindow(gameYears: readonly number[], currentYear: number): number {
+  if (!Number.isSafeInteger(currentYear) || currentYear < 1) return 0;
+  const oldest = currentYear - (debasementReputationWindowYears - 1);
+  let n = 0;
+  for (const year of gameYears) {
+    const y = Math.floor(Number(year) || 0);
+    if (y >= oldest && y <= currentYear) n += 1;
+  }
+  return n;
+}
+export function withDebasementReputation<T extends WorldReputationScore>(
+  map: Readonly<Record<TreatyNationId, T>>,
+  count: number,
+): Record<TreatyNationId, T & { debasements: number }> {
+  const n = Math.max(0, Math.min(debasementReputationMaxCount, Math.floor(Number(count) || 0)));
+  return {
+    kindle: { ...map.kindle, debasements: 0 },
+    korund: { ...map.korund, debasements: 0 },
+    aurelle: { ...map.aurelle, score: (map.aurelle?.score ?? 0) + debasementReputationPenalty * n, debasements: n },
+  };
+}
+
 
 /** #400 [ASSUMPTION]: scheduled AI-leader proposals. A deterministic stand-in for the utility model (not a simulation): at most one proposal per
  *  real-time slot (one day, 12 game days at the 12x clock), rotating through the six pair-and-kind candidates, the proposer alternating each full
@@ -158,7 +189,7 @@ export const kindleStances: Readonly<Record<TreatyKind, Readonly<Record<'korund'
   'non-aggression': { korund: { 'steady-hand': true, 'open-ledger': true, 'dockside-builders': false }, aurelle: { 'steady-hand': true, 'open-ledger': false, 'dockside-builders': false } },
   trade: { korund: { 'steady-hand': true, 'open-ledger': false, 'dockside-builders': true }, aurelle: { 'steady-hand': false, 'open-ledger': true, 'dockside-builders': false } },
 };
-export type Ratification = { nation: TreatyNationId; body: 'Assembly' | 'Chairman' | 'Crown'; passed: boolean; rule: 'two-thirds' | 'simple-majority' | 'sole'; yes?: number; total?: number };
+export type Ratification = { nation: TreatyNationId; body: 'Assembly' | 'Chairman' | 'Crown'; passed: boolean; rule: 'two-thirds' | 'simple-majority' | 'sole'; yes?: number; total?: number; reason?: 'low_reputation' };
 
 /** Docs 13.1: a treaty needs two-thirds of the Assembly, a trade deal a simple majority (more than half). Integers only. */
 export function kindleRatification(kind: TreatyKind, other: TreatyNationId, seats: PartySeats): Ratification {
@@ -172,9 +203,21 @@ export function kindleRatification(kind: TreatyKind, other: TreatyNationId, seat
 /** Korund: the Chairman alone ratifies; Aurelle: the Crown by decree. One AI actor each [ASSUMPTION: always yes]. */
 export const soleRatification = (nation: 'korund' | 'aurelle'): Ratification => ({ nation, body: nation === 'korund' ? 'Chairman' : 'Crown', passed: true, rule: 'sole' });
 
-/** Both signatories' ratifying bodies must approve (docs 13.1: each nation's own body ratifies). */
-export function decideTreaty(kind: TreatyKind, a: TreatyNationId, b: TreatyNationId, kindleSeats: PartySeats): { approved: boolean; ratifications: Ratification[] } {
+/** #1495: a non-aggression pact is refused when the counterpart's World Reputation score is at or below this floor (two broken NAPs at −10). Trade is not gated. */
+export const pactReputationFloor = -20;
+export const napReputationGateFlag = 'HARIMU_NAP_REPUTATION_GATE_ENABLED';
+
+/** Both signatories' ratifying bodies must approve (docs 13.1: each nation's own body ratifies).
+ *  #1495: when `scores` is passed, a signatory whose counterpart is at or below pactReputationFloor refuses a non-aggression pact
+ *  (`reason: 'low_reputation'`), overriding a stance-based or sole yes. A side that already failed is left unchanged. Omitting `scores` is today's rule. */
+export function decideTreaty(kind: TreatyKind, a: TreatyNationId, b: TreatyNationId, kindleSeats: PartySeats, scores?: Readonly<Record<string, { score: number }>> | null): { approved: boolean; ratifications: Ratification[] } {
   const side = (nation: TreatyNationId, other: TreatyNationId) => nation === 'kindle' ? kindleRatification(kind, other, kindleSeats) : soleRatification(nation);
-  const ratifications = [side(a, b), side(b, a)];
+  const ratifications = [side(a, b), side(b, a)].map((ratification, index) => {
+    if (kind !== 'non-aggression' || !scores || !ratification.passed) return ratification;
+    const counterpart = index === 0 ? b : a;
+    const score = scores[counterpart]?.score ?? 0;
+    if (score > pactReputationFloor) return ratification;
+    return { ...ratification, passed: false, reason: 'low_reputation' as const };
+  });
   return { approved: ratifications.every(r => r.passed), ratifications };
 }

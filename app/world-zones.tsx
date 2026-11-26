@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { ReportButton } from './report-button';
 import { acquisitionRules, zoneLabels, zoneOrder, type Zone } from '@/lib/map-zone-labels';
 import type { WorldSquare } from '@/lib/map-zones';
 import { zoneTooltips } from '@/lib/land-copy';
@@ -41,6 +42,16 @@ export function WorldZones({ nationNames = {} }: { nationNames?: Record<string, 
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<WorldSquare | null>(null);
+  type PosterListing = { poster?: { text: string; mine?: boolean } | null; reportsEnabled?: boolean };
+  const [listing, setListing] = useState<PosterListing | null>(null);
+  useEffect(() => {
+    if (!selected) return;
+    let live = true;
+    fetch(`/api/world/registry?x=${selected.x}&y=${selected.y}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() as Promise<PosterListing> : null)
+      .then(v => { if (live) setListing(v); }, () => { if (live) setListing(null); });
+    return () => { live = false; };
+  }, [selected]);
   useEffect(() => {
     if (!show || data) return;
     let active = true;
@@ -57,13 +68,15 @@ export function WorldZones({ nationNames = {} }: { nationNames?: Record<string, 
       {!data && !error && <p role="status">Loading world squares…</p>}
       {data && <div className={styles.grid} style={{ gridTemplateColumns: `repeat(${data.width}, 1fr)` }} role="group" aria-label={`World squares, ${data.width} by ${data.height}`}>
         {data.squares.map(s => <button key={`${s.x},${s.y}`} type="button" className={styles.square} style={{ background: zoneColors[s.zone] }}
-          aria-pressed={selected?.x === s.x && selected?.y === s.y} onClick={() => setSelected(s)}
+          aria-pressed={selected?.x === s.x && selected?.y === s.y} onClick={() => { setSelected(s); setListing(null); }}
           aria-label={`Square ${s.x}, ${s.y}: ${zoneLabels[s.zone]}${s.feature ? `, ${s.feature}` : ''}`}>{s.feature === 'capital' ? '★' : s.feature === 'border outpost' ? '▲' : ''}</button>)}
       </div>}
       {selected && <section className={styles.inspector} aria-live="polite" aria-label="Square inspector">
         <h3>Square {selected.x}, {selected.y}{selected.feature ? ` · ${selected.feature}` : ''}</h3>
         <dl>{squareInspection(selected, nationNames).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
-        <button type="button" onClick={() => setSelected(null)}>Close</button>
+        {listing?.poster?.text ? <p>{listing.poster.text}</p> : null}
+        {listing?.reportsEnabled === true && listing.poster && listing.poster.mine !== true ? <ReportButton kind="square-poster" targetId={`${selected.x},${selected.y}`} /> : null}
+        <button type="button" onClick={() => { setSelected(null); setListing(null); }}>Close</button>
       </section>}
       <small>Reduced-scale preview map · read-only. Buying, founding cities and war are not available yet.</small>
     </>}

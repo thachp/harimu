@@ -1,9 +1,9 @@
 /** #1465: Kindle newspaper writer in NewsDialog; flags.kindleNewspapers only while on. */
 import assert from 'node:assert/strict';
-import {spawnSync} from 'node:child_process';
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {localRuntime} from './helpers/local-runtime.mjs';
+import {mutantTree} from './helpers/mutant-tree.mjs';
 
 const FLAG='HARIMU_KINDLE_NEWSPAPERS_ENABLED';
 const citizenAt=(r,name='kay')=>{
@@ -42,20 +42,6 @@ test('#1465 page and dock wiring: the packed flag is read from the snapshot and 
   assert.match(route,/\.\.\.\(flagOn\(env, KINDLE_NEWSPAPERS_FLAG\) \? \{ kindleNewspapers: true \} : \{\}\)/);
 });
 
-const mutate=(file,find,replace)=>{
-  const original=readFileSync(file,'utf8');
-  const next=original.replace(find,replace);
-  assert.notEqual(next,original,`mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file,next);
-  return ()=>writeFileSync(file,original);
-};
-
-const run= (files, pattern) => {
-  const env={...process.env};
-  delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node',['--experimental-strip-types','--test','--test-concurrency=1','--test-name-pattern',pattern,...files],{encoding:'utf8',cwd:new URL('..',import.meta.url).pathname,env});
-};
-
 test('#1465 mutations: showing the writer while off, skipping requestId reuse, dropping errors, and always packing the citizen flag all fail',()=>{
   const ui='tests/national-news-ui.test.mjs';
   const flags='tests/kindle-news-writer-1465.test.mjs';
@@ -68,11 +54,14 @@ test('#1465 mutations: showing the writer while off, skipping requestId reuse, d
     {file:'app/national-news.tsx',find:"setError(res.data.error??'The article could not be published.');",replace:"setError('The article could not be published.');",files:[ui],pattern:'#1465 the writer shows the server'},
     {file:'app/api/citizen/route.ts',find:'...(flagOn(env, KINDLE_NEWSPAPERS_FLAG) ? { kindleNewspapers: true } : {})',replace:'...({ kindleNewspapers: true })',files:[flags],pattern:'#1465 GET /api/citizen'},
   ];
-  for(const c of cases){
-    const restore=mutate(c.file,c.find,c.replace);
-    try{
-      const result=run(c.files,c.pattern);
-      assert.notEqual(result.status,0,`mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
-    }finally{restore();}
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for(const c of cases){
+      const restore=tree.mutate(c.file,c.find,c.replace);
+      try{
+        const result=tree.run(c.files,c.pattern);
+        assert.notEqual(result.status,0,`mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
+      }finally{restore();}
+    }
+  } finally { tree.close(); }
 });

@@ -1,4 +1,4 @@
-/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is index 97 today, reserved as GRAY 101. */
+/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is index 100 (GRAY 101), after reputation debasement. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -65,16 +65,15 @@ describe('#1505', { concurrency: 1 }, () => {
     assert.deepEqual(lifts([row('e-k', 'korund', 'aurelle'), row('e-a', 'aurelle', 'kindle')], []), ['e-a', 'e-k']);
   });
 
-  test('the flag is preview true, production false, and index 97 after trade renewal', () => {
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 97);
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 98);
+  test('the flag is preview true, production false, and index 100 after reputation debasement', () => {
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_REPUTATION_DEBASEMENT_ENABLED'), 99);
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 100);
     const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
     assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 97);
-    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 97);
+    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 100);
+    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 100);
     assert.doesNotMatch(readFileSync('app/api/world/route.ts', 'utf8'), /runAiTreatyEmbargoes|aiEmbargoCandidates/);
     assert.doesNotMatch(readFileSync('app/api/citizen/route.ts', 'utf8'), /runAiTreatyEmbargoes/);
     assert.doesNotMatch(readFileSync('app/api/news/route.ts', 'utf8'), /runAiTreatyEmbargoes/);

@@ -30,7 +30,7 @@ const touchesArticles = sql => sql.some(q => /kindle_articles|kindle_newspapers/
 
 test('flag is preview true, production false, GRAY 96 at index 95, and listed in previewOnFlags', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED'), 94);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 95); // GRAY 96. Not pinned as last: #1490 trade renewal follows at index 96.
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 95); // GRAY 96. Not pinned as last: #1490 trade renewal is index 96, #1495 NAP gate is index 97, and #1491 battle terrain is index 98.
   const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   assert.equal(preview.vars[FLAG], undefined);
