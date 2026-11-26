@@ -68,7 +68,7 @@ test('#1506 world-simulation reads confidence in the stability Promise.all only 
   const src = readFileSync(new URL('../lib/world-simulation.ts', import.meta.url), 'utf8');
   const block = src.slice(src.indexOf('// #1506: Currency Confidence as of the tick'));
   assert.match(block, /flagOn\(options\.atlasEnv, 'HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED'\) && flagOn\(options\.atlasEnv, 'HARIMU_CROWN_DEBASEMENT_ENABLED'\)/);
-  assert.match(block, /confidenceOn \? readCrownConfidenceAt\(db, Number\(row\.scheduled_at\)\) : undefined/);
+  assert.match(block, /confidenceOn \? readCrownConfidenceAt\(db, Number\(row\.scheduled_at\), \{ warLoss: flagOn\(options\.atlasEnv, 'HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED'\) && flagOn\(options\.atlasEnv, 'HARIMU_WAR_ENDINGS_ENABLED'\) \}\) : undefined/);
   assert.match(block, /Promise\.all\(\[options\.warWeariness[\s\S]*confidenceOn \? readCrownConfidenceAt/);
   assert.doesNotMatch(src, /cron-advance/);
 });

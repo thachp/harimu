@@ -5,7 +5,7 @@ import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
 import { chatBanRefusal } from '@/lib/chat-ban';
-import { dmChatFlagOn, dmConversationId, postDmChatBinds, postDmChatSql, readDmChat } from '@/lib/dm-chat';
+import { blockDmSql, dmBlockCopy, dmBlockOn, dmBlockedByMe, dmBlockedEitherWaySql, dmChatFlagOn, dmConversationId, postDmChatBinds, postDmChatSql, readDmChat, unblockDmSql } from '@/lib/dm-chat';
 
 // #881 part 3: DMs. Flag HARIMU_DM_CHAT_ENABLED off: 404 before auth or any DB access.
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,7 @@ async function citizen(request: Request) {
 }
 const peerOf = (value: unknown) => typeof value === 'string' && value.length > 0 && value.length <= 128 ? value : null;
 const view = async (db: Awaited<ReturnType<typeof getDatabase>>, userId: string, peerId: string, t: number) =>
-  json({ ...await readDmChat(db, userId, peerId, t, parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE)), reportsEnabled: vars().HARIMU_REPORTS_ENABLED === 'true' });
+  json({ ...await readDmChat(db, userId, peerId, t, parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE)), reportsEnabled: vars().HARIMU_REPORTS_ENABLED === 'true', blockedByMe: await dmBlockedByMe(db, userId, peerId) }); // #1516
 
 export async function GET(request: Request) {
   if (!dmChatFlagOn(env)) return json({ error: 'Not found.', reason: 'not_found' }, 404);
@@ -41,6 +41,13 @@ export async function POST(request: Request) {
   const c = await citizen(request); if (c.error) return c.error;
   const { db, userId } = c, t = now(), peerId = peerOf(body.peer);
   if (!peerId || peerId === userId) return json({ error: 'Choose another citizen to message.' }, 400);
+  if (body.action === 'block' && dmBlockOn(env)) { // #1516: idempotent; no message id; not gated by #1517/#790
+    const done = await db.prepare(blockDmSql).bind(userId, t, peerId, userId).run();
+    if (!done.meta.changes && !(await db.prepare('SELECT 1 AS ok FROM citizens WHERE clerk_user_id=? AND nation_id IS NOT NULL').bind(peerId).first()))
+      return json({ error: 'That citizen is not available.' }, 404);
+    return view(db, userId, peerId, t);
+  }
+  if (body.action === 'unblock' && dmBlockOn(env)) { await db.prepare(unblockDmSql).bind(userId, peerId).run(); return view(db, userId, peerId, t); }
   if (typeof body.id !== 'string' || !uuidPattern.test(body.id)) return json({ error: 'Invalid message.' }, 400);
   const id = body.id.toLowerCase();
   if (body.action === 'delete') {
@@ -65,6 +72,8 @@ export async function POST(request: Request) {
       return json({ error: 'Enroll in a nation first.' }, 403);
     if (!replay && !(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(peerId).first<{ nation_id: string | null }>())?.nation_id)
       return json({ error: 'That citizen is not available.' }, 404);
+    if (!replay && await db.prepare(dmBlockedEitherWaySql).bind(userId, peerId, peerId, userId).first())
+      return json({ error: dmBlockCopy.refusal, reason: 'dm_blocked' }, 403); // #1516: same line whichever side blocked
     if (!replay) return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
   } else if (isShadowMuted(parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE), userId, t)) logShadowMuted(userId, id); // #790
   return view(db, userId, peerId, t);

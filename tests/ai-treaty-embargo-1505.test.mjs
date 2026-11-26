@@ -1,4 +1,4 @@
-/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is last at index 102, after treaty break (#1507, index 101). */
+/** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is last at index 103, after war-loss (#1515, index 102). */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -65,16 +65,16 @@ describe('#1505', { concurrency: 1 }, () => {
     assert.deepEqual(lifts([row('e-k', 'korund', 'aurelle'), row('e-a', 'aurelle', 'kindle')], []), ['e-a', 'e-k']);
   });
 
-  test('the flag is preview true, production false, and last at index 102 after treaty break', () => {
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TREATY_BREAK_ENABLED'), 101);
-    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 102);
+  test('the flag is preview true, production false, and last at index 103 after war-loss', () => {
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CROWN_CONFIDENCE_WAR_LOSS_ENABLED'), 102);
+    assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 103);
     assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), FLAG_PACKS.HARIMU_GRAY_PACK.length - 1);
     const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
     assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
     assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 102);
-    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 102);
+    assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 103);
+    assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 103);
     assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), Object.keys(preview.vars.HARIMU_GRAY_PACK).length - 1);
     const cron = readFileSync('lib/diplomacy.ts', 'utf8');
     const body = cron.slice(cron.indexOf('export async function runDiplomacyCron'));
