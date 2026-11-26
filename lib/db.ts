@@ -45,6 +45,7 @@ import { aurelleSuccessionSchemas } from './aurelle-succession'; // #613
 import { hallSchema } from './diplomatic-hall'; // #599
 import { treatySchemas } from './diplomacy'; // #308
 import { embargoSchemas } from './embargo'; // #363
+import { borderIncidentSchemas } from './border-incidents'; // #1527 (migration 0137)
 import { goodsSanctionSchemas } from './goods-sanctions'; // #601
 import { warAssemblySchemas } from './war-assembly'; // #427
 import { warEndingsSchemas } from './war-endings'; // #427 slice 2
@@ -301,6 +302,7 @@ async function initialize(database: GameDatabase) {
     ...cityChatSchemas.map(sql=>database.prepare(sql)), // #881
     ...globalChatSchemas.map(sql=>database.prepare(sql)), // #881 part 2
     ...dmChatSchemas.map(sql=>database.prepare(sql)), // #881 part 3
+    ...borderIncidentSchemas.map(sql=>database.prepare(sql)), // #1527
     ...embassyChatSchemas.map(sql=>database.prepare(sql)), // #882
     ...congregationChatSchemas.map(sql=>database.prepare(sql)), // #1342
     ...partyChatSchemas.map(sql=>database.prepare(sql)), ...kindleNewspaperSchemas.map(sql=>database.prepare(sql)), ...korundStateMediaSchemas.map(sql=>database.prepare(sql)), // #1353, #1453 (migration 0132), #1469 (migration 0134)

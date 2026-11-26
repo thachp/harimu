@@ -2,6 +2,7 @@ import type { GameDatabase } from './database-contract';
 import { flagOn } from './flag-pack.mjs';
 import { mapHeight, mapWidth, mvpNations, onGrid, type Zone } from './map-zones.ts';
 import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-exchange';
+import { borderIncidentsEnabled, borderIncidentStatements, borderIncidentTargets } from './border-incidents'; // #1527
 
 /**
  * World Registry square purchase (#122, docs 6.1 / 15.1). PoC: a citizen of an MVP nation buys one unclaimed
@@ -182,6 +183,9 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   // Flag off: today's fixed price, and no owned-square count. Flag on does not pre-read the count; the INSERT counts.
   if (!dynamic && balance < squarePriceMinor) return fail(409, 'insufficient_tessera', `A square costs ${(squarePriceMinor / 100).toFixed(2)} TSR; you hold ${(balance / 100).toFixed(2)} TSR.`);
   const { x, y, requestId } = command;
+  // #1527 flag on: one incident per neighbouring nation, written only if this purchase row is. Flag off: no statement, so the batch is unchanged.
+  const incidents = borderIncidentsEnabled(env) ? borderIncidentStatements(db, { kind: 'purchase', requestId, actor: nationId, x, y, at: now, radius: 1,
+    targets: borderIncidentTargets(squares, nationId, [{ x, y }]), action: { sql: 'SELECT 1 FROM world_square_purchases WHERE request_id=? AND x=? AND y=?', binds: [requestId, x, y] } }) : [];
   // One batch (one transaction): the purchase row is inserted only if the square is still unowned Wildlands next to the
   // nation's land and the balance still covers the price; the debit and the ownership change follow only if that row exists.
   // Flag on: price_minor is the formula on the nation's count inside that INSERT, and the balance guard uses the same figure.
@@ -198,6 +202,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
         .bind(`tsr-square-${requestId}`, userId, -squarePriceMinor, now, requestId, userId),
       db.prepare(`UPDATE world_squares SET owner=?, zone='frontier' WHERE x=? AND y=? AND EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND x=? AND y=?)`)
         .bind(nationId, x, y, requestId, x, y),
+      ...incidents,
     ]);
     const created = await db.prepare('SELECT request_id FROM world_square_purchases WHERE request_id=?').bind(requestId).first();
     if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
@@ -220,6 +225,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
       .bind(`tsr-square-${requestId}`, userId, now, requestId, userId),
     db.prepare(`UPDATE world_squares SET owner=?, zone='frontier' WHERE x=? AND y=? AND EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND x=? AND y=?)`)
       .bind(nationId, x, y, requestId, x, y),
+    ...incidents,
   ]);
   const created = await db.prepare('SELECT price_minor FROM world_square_purchases WHERE request_id=?').bind(requestId).first<{ price_minor: number }>();
   if (!created) {

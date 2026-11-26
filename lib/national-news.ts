@@ -11,6 +11,7 @@ import {peaceRevertEnabled,peaceRevertNewsItems} from './war-peace-revert'; // #
 import {flagOn} from './flag-pack.mjs'; // #988
 import { readTreaties, treatyNewsItems } from './diplomacy'; // #308
 import { embargoNewsItems, readEmbargoes } from './embargo'; // #363
+import { BORDER_INCIDENTS_FLAG, borderIncidentNewsItems } from './border-incidents'; // #1527
 import { goodsSanctionNewsItems, readGoodsSanctions } from './goods-sanctions'; // #601
 import { undergroundNewsItems } from './korund-underground'; // #295
 import { rallyNewsItems } from './rallies'; // #867
@@ -29,11 +30,11 @@ const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korun
 export function newsEditionOptions(raw: object, userId: string) {
  const env = raw as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string; HARIMU_WAR_ENABLED?: string; HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string; HARIMU_TARGETED_SANCTIONS_ENABLED?: string; HARIMU_FAITH_ENABLED?: string; HARIMU_FOUNDING_PERIOD_ENABLED?: string; HARIMU_KINDLE_RALLIES_ENABLED?: string; HARIMU_CHAT_SHADOW_MUTE?: string };
  const on = (key: keyof typeof env) => env[key] === 'true';
- return { korundPresidium: on('HARIMU_KORUND_PRESIDIUM_ENABLED'), war: on('HARIMU_WAR_ENABLED'), diplomacy: on('HARIMU_DIPLOMACY_ENABLED'), embargo: on('HARIMU_EMBARGO_ENABLED'), targetedSanctions: on('HARIMU_TARGETED_SANCTIONS_ENABLED'), faith: on('HARIMU_FAITH_ENABLED'), foundingPeriod: on('HARIMU_FOUNDING_PERIOD_ENABLED'), rallies: on('HARIMU_KINDLE_RALLIES_ENABLED'), planStats: flagOn(raw, 'HARIMU_KORUND_PLAN_STATS_ENABLED'), peaceRevert: peaceRevertEnabled(raw), confluence: flagOn(raw, 'HARIMU_CONFLUENCE_ENABLED'), ...(flagOn(raw, KINDLE_NEWSPAPERS_FLAG) ? { kindleNewspapers: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}), ...(flagOn(raw, AURELLE_BROADSHEETS_FLAG) ? { aurelleBroadsheets: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}), ...(flagOn(raw, KORUND_STATE_MEDIA_FLAG) ? { korundStateMedia: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}) };
+ return { korundPresidium: on('HARIMU_KORUND_PRESIDIUM_ENABLED'), war: on('HARIMU_WAR_ENABLED'), diplomacy: on('HARIMU_DIPLOMACY_ENABLED'), embargo: on('HARIMU_EMBARGO_ENABLED'), targetedSanctions: on('HARIMU_TARGETED_SANCTIONS_ENABLED'), faith: on('HARIMU_FAITH_ENABLED'), foundingPeriod: on('HARIMU_FOUNDING_PERIOD_ENABLED'), rallies: on('HARIMU_KINDLE_RALLIES_ENABLED'), planStats: flagOn(raw, 'HARIMU_KORUND_PLAN_STATS_ENABLED'), peaceRevert: peaceRevertEnabled(raw), confluence: flagOn(raw, 'HARIMU_CONFLUENCE_ENABLED'), ...(flagOn(raw, BORDER_INCIDENTS_FLAG) ? { borderIncidents: true } : {}), ...(flagOn(raw, KINDLE_NEWSPAPERS_FLAG) ? { kindleNewspapers: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}), ...(flagOn(raw, AURELLE_BROADSHEETS_FLAG) ? { aurelleBroadsheets: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}), ...(flagOn(raw, KORUND_STATE_MEDIA_FLAG) ? { korundStateMedia: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}) };
 }
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean;kindleNewspapers?:boolean;aurelleBroadsheets?:boolean;korundStateMedia?:boolean;readerId?:string;shadowMute?:unknown}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean;kindleNewspapers?:boolean;aurelleBroadsheets?:boolean;korundStateMedia?:boolean;borderIncidents?:boolean;readerId?:string;shadowMute?:unknown}={}):Promise<NationalNews|null> {
  if(nationId==='confluence')return options.confluence?readConfluenceCurrentDaily(db,now):null; // #1443 existing opening flag; no new flag
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
@@ -64,6 +65,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  if(options.foundingPeriod)items.push(...foundingNewsItems(await readFoundingEvents(db),nationId)); // #612 day-30 event line, derived on read
  if(options.targetedSanctions)items.push(...goodsSanctionNewsItems((await readGoodsSanctions(db)).sanctions,nationId)); // #601 impose and lift lines, derived on read
  if(options.embargo)items.push(...embargoNewsItems((await readEmbargoes(db)).embargoes,nationId)); // #363 impose and lift lines, derived on read
+ if(options.borderIncidents)items.push(...await borderIncidentNewsItems(db,nationId)); // #1527 one wire line per incident naming this nation, derived on read
  if(tick){
   const proposals=JSON.parse(tick.proposals_json) as (GovernmentSnapshot|null)[];
   const snapshot=publicGovernmentSnapshot(proposals.find(proposal=>proposal?.nationId===nationId)??null);

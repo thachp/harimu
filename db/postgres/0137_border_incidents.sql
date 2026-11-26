@@ -1,0 +1,3 @@
+-- #1527: border incidents feed the casus belli grievance score (docs §13.5). Flag HARIMU_BORDER_INCIDENTS_ENABLED (GRAY 105; off in production). Additive only.
+CREATE TABLE IF NOT EXISTS border_incidents (id TEXT PRIMARY KEY, request_id TEXT NOT NULL, actor_nation TEXT NOT NULL CHECK(actor_nation IN ('kindle','korund','aurelle')), target_nation TEXT NOT NULL CHECK(target_nation IN ('kindle','korund','aurelle')), x INTEGER NOT NULL, y INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('purchase','city_founding')), occurred_at INTEGER NOT NULL, UNIQUE(kind, request_id, target_nation), CHECK(actor_nation <> target_nation));
+CREATE INDEX IF NOT EXISTS border_incidents_pair ON border_incidents(actor_nation, target_nation, occurred_at);
