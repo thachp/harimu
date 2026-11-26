@@ -1,6 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { citiesForNation, cityForNation } from '../lib/cities';
+import { desktopGateEnabled } from '../lib/desktop-gate';
+import { nationCities3dEnabled, onNationCity, pickNationCity } from '../lib/nation-cities-3d';
+import { NationCitiesScene } from './nation-cities-scene';
 import styles from './country-scene.module.css';
 
 import { countryWord } from '../lib/ui-v2-rail';
@@ -11,6 +14,7 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
   presence?: readonly { cityId: string; present: number }[];
 }) {
   const [destinationId, setDestinationId] = useState<string | null>(null);
+  useEffect(() => onNationCity(id => { if (!pending) setDestinationId(id); }), [pending]);
   const cities = citiesForNation(nationId);
   const destination = destinationId ? cityForNation(nationId, destinationId) : undefined;
   const current = currentCityId ? cityForNation(nationId, currentCityId) : undefined;
@@ -20,14 +24,15 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
     <h2 id="country-scene-title">{countryWord()} map</h2>
     <p>{preview ? 'Sample visit · no citizen changes. ' : ''}Free, instant travel within this nation · home city unchanged.</p>
     <p>Current city: <strong>{current?.name ?? 'Not visiting'}</strong> · Home city: <strong>{home?.name ?? 'None in this nation'}</strong></p>
-    <div className={styles.map} aria-label="Illustrative country map">
+    <div className={`${styles.map} nation-cities-map`} aria-label="Illustrative country map">
+      {nationCities3dEnabled() && desktopGateEnabled() ? <NationCitiesScene nationId={nationId} cities={cities} selectedId={destination?.id ?? null} onSelect={id => { if (!pending) pickNationCity(id); }} /> : null}
       <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M14 20 38 9 62 15 88 30 83 58 92 77 68 90 45 82 23 89 9 62 18 42Z"/><path className={styles.routes} d="M26 64 50 40 76 64"/></svg>
       {cities.map((city, index) => {
         const count = presence?.find(entry => entry.cityId === city.id)?.present;
         const knownCount = Number.isInteger(count) && count! >= 0;
         return <button type="button" key={city.id} className={styles.pin} data-capital={bleed && city.capital ? 'true' : undefined}
         style={{left:`clamp(calc(var(--pin-max) / 2), ${pins[index].x}%, calc(100% - var(--pin-max) / 2))`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
-        onClick={() => { if (!pending) setDestinationId(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
+        onClick={() => { if (!pending) pickNationCity(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
         {bleed && city.capital ? <span className={styles.capitalMarker} aria-hidden="true" /> : null}<span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
         <small>{knownCount ? `${count} sharing presence` : preview ? 'Presence shows in your own nation' : 'Online count unavailable'}</small>
       </button>; })}
