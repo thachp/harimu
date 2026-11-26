@@ -4,7 +4,7 @@ export const NATION_CITIES_3D_FLAG = 'NEXT_PUBLIC_HARIMU_NATION_CITIES_3D';
 export function nationCities3dFlag(): string | undefined { try { return process.env.NEXT_PUBLIC_HARIMU_NATION_CITIES_3D; } catch { return undefined; } }
 export function nationCities3dEnabled(value: string | undefined = nationCities3dFlag()): boolean { return value === 'true'; }
 export type CityPoint = { id: string; name: string; x: number; z: number; capital: boolean };
-/** Catalog cities have no coordinates. Places them on a ring in list order. [ASSUMPTION] */
+export function pillInView(x: number, y: number, z: number) { return !(z > 1 || x < -1 || x > 1 || y < -1 || y > 1); }
 export function nationCityLayout(cities: readonly { id: string; name: string; capital?: boolean }[]): CityPoint[] {
   const n = Math.max(cities.length, 1), ring = cities.length < 2 ? 0 : 8;
   return cities.map((city, i) => {
